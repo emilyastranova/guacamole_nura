@@ -1,0 +1,34 @@
+# Dependencies and sub-clones
+pmbootstrap/
+
+# Build and chroot directories
+.work/
+work/
+chroot-*/
+cache/
+ccache/
+
+# Downloaded binaries and firmware
+*.tar.gz
+*.tar.xz
+*.bin
+*.img
+*.dtb
+device.dts
+device.dtb
+boot.img
+
+# Temporary and editor files
+*.swp
+*~
+.vscode/
+.idea/
+*.log
+
+# Kernel build artifacts (if built in-tree)
+*.o
+*.ko
+*.mod.c
+modules.order
+Module.symvers
+.config.old

@@ -1,0 +1,145 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright (c) 2026, Nura Project Contributors
+ * Device tree for OnePlus 7 Pro (oneplus-guacamole)
+ * SoC: Qualcomm Snapdragon 855 (SM8150)
+ */
+
+/dts-v1/;
+
+#include "sm8150.dtsi"
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+
+/ {
+	model = "OnePlus 7 Pro";
+	compatible = "oneplus,guacamole", "qcom,sm8150";
+	chassis-type = "handset";
+
+	/*
+	 * Qualcomm bootloader (ABL) DTB matching properties:
+	 * Extract exact values from downstream stock dtb via extract_dtb.sh:
+	 * SM8150 SoC ID is 339 (0x153). Board-id must match bootloader.
+	 */
+	qcom,msm-id = <0x153 0x0>;
+	qcom,board-id = <0x8 0x0>; /* FIXME: Verify against downstream extracted DTB */
+
+	chosen {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		/*
+		 * Simple Framebuffer: Reuses bootloader splash framebuffer.
+		 * Address is extracted from downstream 'cont_splash_region'.
+		 * OnePlus 7 Pro resolution: 1440x3120, 32-bit (stride = 1440 * 4 = 5760).
+		 */
+		framebuffer@9c000000 {
+			compatible = "simple-framebuffer";
+			reg = <0x0 0x9c000000 0x0 (1440 * 3120 * 4)>; /* FIXME: Adjust base address from downstream DTB */
+			width = <1440>;
+			height = <3120>;
+			stride = <(1440 * 4)>;
+			format = "a8r8g8b8";
+			clocks = <&gcc GCC_DISP_HF_AXI_CLK>, <&gcc GCC_DISP_SF_AXI_CLK>;
+		};
+	};
+
+	/*
+	 * Downstream reserved-memory comparison:
+	 * Compare all memory nodes with sm8150.dtsi.
+	 * If hypervisor panics or resets during boot, adjust or delete offending nodes.
+	 */
+	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		/* Framebuffer reserved memory reservation */
+		cont_splash_mem: memory@9c000000 {
+			reg = <0x0 0x9c000000 0x0 0x1800000>;
+			no-map;
+		};
+
+		/* Ramoops pstore memory region for post-mortem crash logging */
+		ramoops@ffc00000 {
+			compatible = "ramoops";
+			reg = <0x0 0xffc00000 0x0 0x100000>; /* FIXME: Locate safe unreserved RAM region */
+			record-size = <0x20000>;
+			console-size = <0x40000>;
+			ftrace-size = <0x0>;
+			pmsg-size = <0x20000>;
+		};
+	};
+
+	gpio-keys {
+		compatible = "gpio-keys";
+		autorepeat;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&vol_up_default>;
+
+		vol-up {
+			label = "Volume Up";
+			gpios = <&pm8150_gpios 6 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_VOLUMEUP>;
+			debounce-interval = <15>;
+			wakeup-source;
+		};
+	};
+};
+
+/*
+ * Protected GPIO pins:
+ * TrustZone / Secure OS monitors fingerprint and NFC GPIO lines.
+ * Linux must not touch these to prevent hypervisor crashes.
+ */
+&tlmm {
+	gpio-reserved-ranges = <0 4>, <59 4>; /* FIXME: Verify against downstream schematic / DT */
+
+	vol_up_default: vol-up-default-state {
+		pins = "gpio6";
+		function = "normal";
+		bias-pull-up;
+		input-enable;
+	};
+};
+
+/* UFS 3.0 Storage */
+&ufs_mem_hc {
+	status = "okay";
+	reset-gpios = <&tlmm 175 GPIO_ACTIVE_LOW>;
+	vcc-supply = <&vreg_l10a_2p95>;
+	vcc-max-microamp = <750000>;
+	vccq2-supply = <&vreg_s4a_1p8>;
+	vccq2-max-microamp = <750000>;
+};
+
+&ufs_mem_phy {
+	status = "okay";
+	vdda-phy-supply = <&vreg_l5a_0p875>;
+	vdda-pll-supply = <&vreg_l9a_1p2>;
+};
+
+/* USB 3.1 Type-C controller */
+&usb_1_hsphy {
+	status = "okay";
+	vdd-supply = <&vreg_l5a_0p875>;
+	vdda18-supply = <&vreg_l12a_1p8>;
+	vdda33-supply = <&vreg_l2a_3p1>;
+};
+
+&usb_1_qmpphy {
+	status = "okay";
+	vdda-phy-supply = <&vreg_l3c_1p2>;
+	vdda-pll-supply = <&vreg_l5a_0p875>;
+};
+
+&usb_1 {
+	status = "okay";
+};
+
+&usb_1_dwc3 {
+	dr_mode = "otg";
+	usb-role-switch;
+};
