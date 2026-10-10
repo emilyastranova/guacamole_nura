@@ -26,7 +26,9 @@ echo "Connected device: $DEVICE"
 
 # Determine boot.img path
 BOOTIMG=""
-if [ -f "$REPO_ROOT/boot.img" ]; then
+if [ -f "$REPO_ROOT/build/boot.img" ]; then
+    BOOTIMG="$REPO_ROOT/build/boot.img"
+elif [ -f "$REPO_ROOT/boot.img" ]; then
     BOOTIMG="$REPO_ROOT/boot.img"
 else
     # Check default pmbootstrap chroot output
