@@ -4,6 +4,7 @@ pmbootstrap/
 # Build and chroot directories
 .work/
 work/
+build/
 chroot-*/
 cache/
 ccache/
