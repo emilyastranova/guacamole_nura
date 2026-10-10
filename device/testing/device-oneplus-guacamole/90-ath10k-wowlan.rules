@@ -1,0 +1,14 @@
+# Enable system-wakeup capability for the ath10k (WCN3990) Wi-Fi device so
+# WoWLAN can wake the SoC out of s2idle. NetworkManager programs the actual
+# WoWLAN triggers (magic / disconnect) from the connection's wake-on-wlan
+# setting, but that only takes effect if the underlying device is allowed to
+# wake the system (power/wakeup). On first boot this defaults to "disabled",
+# so force it on once the wlan netdev appears.
+#
+# Scoped to the on-SoC SNoC Wi-Fi (18800000.wifi); TEST= guards that the
+# wakeup attribute exists (it only does once the driver marks the device
+# wakeup-capable).
+ACTION=="add", SUBSYSTEM=="net", KERNELS=="18800000.wifi", \
+    TEST=="device/power/wakeup", ATTR{device/power/wakeup}="enabled"
+
+

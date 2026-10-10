@@ -1,0 +1,44 @@
+#!/bin/sh
+# NetworkManager dispatcher: arm WoWLAN on guacamole.
+#
+# The 90-wifi-wowlan.conf connection-default populates the connection's
+# wake-on-wlan policy (magic|disconnect), but NetworkManager does NOT push that
+# value to the hardware on activation. Verified on-device: with the profile at
+# 0xc but `iw phy0 wowlan show` still "disabled", a system suspend takes the
+# plain DEAUTH_LEAVING path instead of WoW. So on every Wi-Fi "up":
+#   1) ensure the device may wake the system (belt with 90-ath10k-wowlan.rules),
+#   2) ensure the connection carries the wake-on-wlan policy (idempotent),
+#   3) force NM to apply that policy to the live device with `nmcli device
+#      reapply`, which is what actually programs the chip (iw -> enabled).
+# This keeps NetworkManager as the single owner of WoW policy; reapply is just
+# the NM-native push it otherwise skips.
+
+IFACE="$1"
+ACTION="$2"
+
+[ "$ACTION" = "up" ] || exit 0
+# Wi-Fi interfaces only.
+[ -d "/sys/class/net/$IFACE/wireless" ] || exit 0
+
+wake="/sys/class/net/$IFACE/device/power/wakeup"
+[ -w "$wake" ] && echo enabled > "$wake"
+
+[ -n "$CONNECTION_UUID" ] || exit 0
+
+# Ensure the policy is on the profile (covers a saved profile that predates the
+# connection-default). nmcli -g returns the flags as e.g. "0xc".
+cur=$(nmcli -g 802-11-wireless.wake-on-wlan connection show "$CONNECTION_UUID" 2>/dev/null)
+case "$cur" in
+	*magic*|0xc|0xC|12) ;;	# already requesting magic+disconnect
+	*)
+		nmcli connection modify "$CONNECTION_UUID" \
+			802-11-wireless.wake-on-wlan magic,disconnect
+		;;
+esac
+
+# NM doesn't program wake-on-wlan onto the device at activation; reapply does.
+nmcli device reapply "$IFACE"
+
+exit 0
+
+

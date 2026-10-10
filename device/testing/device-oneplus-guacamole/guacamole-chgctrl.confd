@@ -1,0 +1,13 @@
+# Resume charging when battery drops to or below this percentage
+CHG_MIN=40
+
+# Stop charging when battery reaches this percentage
+CHG_MAX=80
+
+# Server mode: while charge control runs, hold a kernel wake lock so the device
+# never suspends (keeps Docker / LAN services reachable). This treats "charge
+# control enabled" as "permanently plugged in == server". Set to "no" to keep
+# normal phone-style suspend behaviour while still limiting charge.
+KEEP_AWAKE=yes
+
+

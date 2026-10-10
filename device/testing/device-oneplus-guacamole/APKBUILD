@@ -1,20 +1,38 @@
 # Reference: <https://postmarketos.org/devicepkg>
-maintainer="Emily <emily@localhost>"
+# Co-Maintainer: Uclydde <julianbraha@gmail.com>
+maintainer="Casey Connolly <kcxt@postmarketos.org>"
 pkgname=device-oneplus-guacamole
 pkgdesc="OnePlus 7 Pro"
-pkgver=1
-pkgrel=0
-url="https://wiki.nura.eco/wiki/OnePlus_7_Pro_(oneplus-guacamole)"
+pkgver=4
+pkgrel=1
+url="https://postmarketos.org"
 license="MIT"
 arch="aarch64"
 options="!check !archcheck"
 depends="
+	firmware-oneplus-guacamole
 	linux-postmarketos-qcom-sm8150
 	mkbootimg
 	postmarketos-base
+	msm-modem
+	pd-mapper
+	rmtfs
+	tqftpserv
 "
 makedepends="devicepkg-dev"
-source="deviceinfo"
+subpackages="$pkgname-openrc"
+source="
+	deviceinfo
+	$pkgname-openrc.post-install
+	guacamole-mpss.initd
+	guacamole-chgctrl.initd
+	guacamole-chgctrl.daemon
+	guacamole-chgctrl.confd
+	sxmo_deviceprofile-oneplus-guacamole.sh
+	90-wifi-wowlan.conf
+	90-ath10k-wowlan.rules
+	10-wifi-wowlan
+"
 
 build() {
 	devicepkg_build $startdir $pkgname
@@ -22,8 +40,50 @@ build() {
 
 package() {
 	devicepkg_package $startdir $pkgname
+
+	# Enable WoWLAN (magic + disconnect) by default (NM connection default).
+	install -Dm644 "$srcdir/90-wifi-wowlan.conf" \
+		"$pkgdir/usr/lib/NetworkManager/conf.d/90-wifi-wowlan.conf"
+
+	# Force the Wi-Fi device wakeup-capable bit on so WoWLAN can wake from s2idle.
+	install -Dm644 "$srcdir/90-ath10k-wowlan.rules" \
+		"$pkgdir/usr/lib/udev/rules.d/90-ath10k-wowlan.rules"
+
+	# Deterministically arm wake-on-wlan on the active Wi-Fi profile.
+	install -Dm755 "$srcdir/10-wifi-wowlan" \
+		"$pkgdir/etc/NetworkManager/dispatcher.d/10-wifi-wowlan"
+}
+
+openrc() {
+	install_if="$pkgname=$pkgver-r$pkgrel openrc"
+	install="$subpkgname.post-install"
+	depends="pd-mapper-openrc tqftpserv-openrc openrc"
+	install -Dm755 "$srcdir/guacamole-mpss.initd" \
+		"$subpkgdir/etc/init.d/guacamole-mpss"
+	install -Dm755 "$srcdir/guacamole-chgctrl.initd" \
+		"$subpkgdir/etc/init.d/guacamole-chgctrl"
+	install -Dm755 "$srcdir/guacamole-chgctrl.daemon" \
+		"$subpkgdir/usr/libexec/guacamole-chgctrl"
+	install -Dm644 "$srcdir/guacamole-chgctrl.confd" \
+		"$subpkgdir/etc/conf.d/guacamole-chgctrl"
+	# sxmo looks up device profiles by the exact "vendor,codename" compatible
+	# string; abuild rejects commas in source= filenames, so the tracked file
+	# uses dashes and gets installed under the comma name sxmo expects.
+	install -Dm755 "$srcdir/sxmo_deviceprofile-oneplus-guacamole.sh" \
+		"$subpkgdir/usr/bin/sxmo_deviceprofile_oneplus,guacamole.sh"
 }
 
 sha512sums="
-9bba262e606ee37c7ad3f661421b55738197c4cafc3d0b1a43fb966421847aeeab454fdde415d8fc596aae925d0bc998b6cf2411045c8b26444db59e3d6c64d9  deviceinfo
+2c1214fa5c2c3a29f068cc85a5a4ab4cc5b724d7c85270cac8602e82743d66d6960fe541c006ec845d090219fda9d47b77e26dc71a758590e1b2f2f33c969579  deviceinfo
+972448fdf4e96b55d58543bd1050b82e3d8067e495c43720100ce4903c3d26e1a076d4c85a82df0a2112b064416a6570c7391872f91fea4d730220e933f916af  device-oneplus-guacamole-openrc.post-install
+e5d99440d903e957a57f1dbc866c1d23a7348aedf546110e3bf9fd8d690531a15a0a9a63d3bb4df9aba421aae165153c764312e403804da60f0887ae5cec4391  guacamole-mpss.initd
+dbf092abc7d86a8eb56b8533db8027fe5435926a9ee5fdd5f100b86fa2f738d9b4e303153b470c1ec61b3a54c32a0b4181af0c41746ee9e57c997c6021f04344  guacamole-chgctrl.initd
+232fb758d51c271eed048c9e5cf26f2e61121582feff24d4cc4a16734f7fa0d04047d1a88d581247e54a81a3f522341dc5744012eeea610e9b57039e7c4df8f2  guacamole-chgctrl.daemon
+a83e95fad5ba61e251af16c5e520f500977093242744b7761a42d0b960cafc226c7c2ab5ea81113f683cd5e3d34caeacc536945a75e5a18c74c0bd30d671c12a  guacamole-chgctrl.confd
+21c74600848994fe1a3b1598fdd56854bda569ab3376b168fd78ab67e1793f0fd6af42b9e0dbbac7657c37040c112e880039d3d1c713b55b08a750ed8bba5db7  sxmo_deviceprofile-oneplus-guacamole.sh
+065771fcfa63af1d0ef8f7c1fc5bed9e824ac24aafb850e14c8136b2ead8487f977715bb3bf64eb22cb6414d6b45fccde0ff73f4266f7492c4bed52618a60039  90-wifi-wowlan.conf
+a30852c2498e54a04d84cc1af85f2735f18ff8763768bfd36233cdb3d7703b9868bad51f29e8be10878e411bbc6ed873dd096b6771b6d7bc61815e8b176d4bed  90-ath10k-wowlan.rules
+f9d4e7c2f69996bb2c05f4c3a2531ada9506eca3aaa85fe12f4caa89552c4d79862d774b630d0b9ab66add1a1005e647a8dd3d0f0644e11ef1f676156be9a109  10-wifi-wowlan
 "
+
+

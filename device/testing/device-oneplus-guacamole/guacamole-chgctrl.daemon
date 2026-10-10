@@ -1,0 +1,32 @@
+#!/bin/sh
+
+CAPACITY="/sys/class/power_supply/bq27541-0/capacity"
+STATUS="/sys/class/power_supply/pm8150b-charger/status"
+
+: ${CHG_MIN:=40}
+: ${CHG_MAX:=80}
+
+cap=$(cat "$CAPACITY" 2>/dev/null)
+if [ -n "$cap" ] && [ "$cap" -ge "$CHG_MAX" ]; then
+	suspended=1
+	echo 0 > "$STATUS"
+else
+	suspended=0
+fi
+
+while true; do
+	cap=$(cat "$CAPACITY" 2>/dev/null)
+	if [ -z "$cap" ]; then sleep 10; continue; fi
+
+	if [ "$suspended" -eq 0 ] && [ "$cap" -ge "$CHG_MAX" ]; then
+		echo 0 > "$STATUS"
+		suspended=1
+	elif [ "$suspended" -eq 1 ] && [ "$cap" -le "$CHG_MIN" ]; then
+		echo 2 > "$STATUS"
+		suspended=0
+	fi
+
+	sleep 60
+done
+
+

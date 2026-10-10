@@ -1,0 +1,107 @@
+pkgname=firmware-oneplus-guacamole
+pkgdesc="OnePlus 7 Pro firmware (WiFi, modem, GPU zap shader)"
+pkgver=1
+pkgrel=0
+url="https://github.com/M1DNYT3/firmware-oneplus-guacamole"
+license="proprietary"
+arch="aarch64"
+options="!check !archcheck !strip"
+depends="firmware-qcom-adreno-a640"
+_commit="f071a51faf6f6250c35662e8091deb2cb484a025"
+_raw="https://raw.githubusercontent.com/M1DNYT3/firmware-oneplus-guacamole/$_commit"
+
+_gpu="a640_zap.mdt a640_zap.b00 a640_zap.b01 a640_zap.b02"
+_wlan="board.bin board-2.bin"
+_pd="wlanmdsp.mbn modemuw.jsn"
+_modem="modem.mdt modem.b00 modem.b01 modem.b02 modem.b03 modem.b04 modem.b05
+	modem.b06 modem.b07 modem.b08 modem.b09 modem.b10 modem.b11 modem.b12
+	modem.b13 modem.b14 modem.b15 modem.b17 modem.b18 modem.b19 modem.b20
+	modem.b21 modem.b23 modem.b24 modem.b25 modem.b26 modem.b27 modem.b28
+	modem.b29 modem.b30 modem.b31"
+
+source="30-gpu-firmware.files"
+for _f in $_gpu; do
+	source="$source $_f::$_raw/qcom/$_f"
+done
+for _f in $_wlan; do
+	source="$source $_f::$_raw/ath10k/WCN3990/hw1.0/$_f"
+done
+for _f in $_pd $_modem; do
+	source="$source $_f::$_raw/qcom/sm8150/oneplus7/$_f"
+done
+
+package() {
+	local f
+
+	# GPU zap shader (split ELF format for qcom_mdt_loader)
+	for f in $_gpu; do
+		install -Dm644 "$srcdir/$f" "$pkgdir/lib/firmware/qcom/$f"
+	done
+
+	# WCN3990 WiFi board data
+	for f in $_wlan; do
+		install -Dm644 "$srcdir/$f" \
+			"$pkgdir/lib/firmware/ath10k/WCN3990/hw1.0/$f"
+	done
+
+	# pd-mapper files: WLAN protection domain descriptor and DSP firmware
+	for f in $_pd; do
+		install -Dm644 "$srcdir/$f" \
+			"$pkgdir/lib/firmware/postmarketos/qcom/sm8150/oneplus7/$f"
+	done
+
+	# MPSS modem firmware (required for WCN3990 WiFi via QRTR/WLFW)
+	for f in $_modem; do
+		install -Dm644 "$srcdir/$f" \
+			"$pkgdir/lib/firmware/qcom/sm8150/oneplus7/$f"
+	done
+
+	# mkinitfs file list so GPU firmware is available before rootfs mounts
+	install -Dm644 "$srcdir/30-gpu-firmware.files" \
+		"$pkgdir/usr/share/mkinitfs/files/30-gpu-firmware.files"
+}
+
+sha512sums="
+263cc11cbc6994e96c2ab29310aa09d078d210d22e79ac13d264134118c66cc2ec6d25cd4080087379f0489f3186bd3197848c0732dbc3ea13401ccb1c6827fb  30-gpu-firmware.files
+95f70f93df6b6f9f56b0bf3f5b4699f3dc676f1132d5fd47f6f0cdb9435634ef8a2f54deea47c1823edcdd1d5fc5d8ab185eb959b1becc27bbdf86803b06148d  a640_zap.mdt
+65481da7c71a90a0f083cd74e58166a398396b95ae166722026dab9973ae68c94c17698ab5ac56241d5fa9d091ec3a79fef1d477e1f44e388bea968937b1dbc7  a640_zap.b00
+3a39dca65483f884f06a80fb3cb899096e0feb9beba3ee3bf511bd7a54740d6b374b36e46db66e61a83e6861776207e1b240691581f212739c06c19c5ce05351  a640_zap.b01
+d0a1565cd5ebd776155c67e43ba993489ab6052ca48076f6a29bb0e1e22a9e3cf8685f361ce6ee4095661c1da8d6bb3dcad91932ec4e92db56f8ff05e4b94d8b  a640_zap.b02
+229f012e8c6aaa7e8f29b6f669a4a4a04520d6b3d910c07ef445028ebd8713d72a4d1412f91a9e31c237d74786855ac38908c7cbd304605c04b9fe7fb42f0e95  board.bin
+fe51a4d09dc9a0597f9ede1f24d659e515dc4b83d8cfa693f49e6b1828927db9d33eb443b2533ac1cb1aaeb213b6b23e94b883ab8726bdcc10ce556f26f8d129  board-2.bin
+db99cef2a67452113d580bd409a2b9612e0570c944a70bc2ce96128f39fb38290357e29ec8560df12af84294768f7ec8091a629653624add26f2b05ad6b29fa3  wlanmdsp.mbn
+ad8aa1ce27b4a10f2b522d7f7277edc5ec40dd20da7aefc3ac00ea44f449e90adeede5e7fd02be189cb51315b3ce268e930bac9efee8dfbcb56246c7bf65c6ad  modemuw.jsn
+46485b9e5e2db1e92d726ff9053ebc9a2e85e4da3846f999ecbc933caf49729fdc88a9cd0f7c701181aca971361cf916997fbd541936d04f61f7ca98c1b19eab  modem.mdt
+b0d906c675e982c7121705ef6c05c77ea6dcdd6f8ff34773c7745af8ff0e0ca6544c4590a6c8662585afc30a11283184b383e473d732928058fd92b2baaeb3d1  modem.b00
+f18d08edd8571d399dbe45a767005e2a11936b9ca224831a6f4396d01ae6ae5c2a3e09b58c6f47e6e8ebbaf65705242850b792d3f233b3080eaa8f37d7b063a2  modem.b01
+d1121c221b800ef6301df865c66323bea8d47f5ffc73a87ef76118ee8263693060013773236e54f829a3699122b376520734fb38a8e32a2c469444cd2891f096  modem.b02
+ec0c94aa7585d2b5074862d3e11423e81eea78a55bfef7f5f91becb90ce1fd45f780039c1cb51b4e368cccae0a715345796f0f2cc72d7d7e0c9015e8f7a250a1  modem.b03
+5316d062c972d1fe0ed05ace5f16dc0f4dc50e0291172b0fc36ab096e2b282b11219ee5646339a0f55a77fa87ac09d6b0f1abeb377f40ebe536162ced166dd82  modem.b04
+879956545ddfcdb7c66c79db33e595f0cef872e9fdbf31208832a3c28ea8115f895403c02afec813f73b0e37819988cb2c48b4008cf80028b45d41e490020495  modem.b05
+1b091cc534ec2db2b6c5bac453868f3cc4473edcca40098ad359a7ee00f2886ec5fd2d884914937346205696b0644c5a0f1e52deece7ca7eadfe638a3a3b4045  modem.b06
+
+76f0d345534711a6495f388fe37d22735a899eda7483ea13cb4d0af316fadb51240a3eb1a903ab8383654388dc8313770693af838c7219776732b127703b55fc  modem.b07
+5ea0c826f8a9e6b2d78bbebf10cd3c8381c6d0e94d29a17c4811a4752960f414d841106189e0567bf9c9c6d6d519b6ab915cdfb35699088332cfc5230f46416c  modem.b08
+ad726e31536c59290fafa1d8fbaca2fedb230b2bf565e693b3c7eb78c2402a1cf4c694dc505cf612b38138b2761765b1f79c0153382f392d645a0f90a3ebccdc  modem.b09
+02fdb32d87beb76a355fe3f4536e5155a080fd122ff046b53830fec2ea6d3137ab542bba3af4827acc54081e1a34427f261ed9596746269cc74bf61402f75e8c  modem.b10
+0cbe66f03c789311b605baaeffb4406656900ce51b9fb1444ebf89704a32d6a5032a095a828f4924ed5b02c681aab556fd4147271f133bdea6d8f355af30a5d6  modem.b11
+aacf99eb3d42f0ab2e0f90b169cbbcad13a0fbd51e87ecf4f988bd299b0cb62ae4eced4a952bf014359d97679721a75b73b420274a94b710a922f95e09bf524b  modem.b12
+206990b73a73a9ca2600307bc6c57fe39cde039fe14d4be319da9865fa2a750e704a393291be2a56d2f582702d6cf53f1e418c984020d142022f5d533d81e30c  modem.b13
+523594a7cc305c4fcb20d5268f45301b08c127658fe517c9040c42de2d093483736b75a95b80b26153c8418cedc29b5f69d01b1b1c94b1c9b4b92fe1ac71dcbf  modem.b14
+c947dbf4f429ab65130e68560d0ff3ffacc0aaef6476cbfb374b8bde3cdf14a9aab776dc15485b30b0374e6acc54693512f7cc8ff1ade3af4aff8fb4cce1b12c  modem.b15
+f106d5e0e98113400923422dc6635aad76ca65b87eb2818bba9c25750a67fd9a036fa77542d6492a52da4276a5c78441c68cff4a85fa9242e234e6c75a9f3223  modem.b17
+9f04c0c5f1dcc23dbc40568d234377c091546324d2c7ecfbf22124fc0a42a6de08d2af13672ad6ce8d3e65bd83ab89b830865fd091854c5829b242e3b231e88b  modem.b18
+3ea25c9ece732ad4fde7ecf74574f655dea8616eaa67e0bb33b02d072a7d8dbf902a5063cadf4e38c3614d3a121fa85b1aa10bb9683521d630fa0500649050f2  modem.b19
+ba653c8d3dcb0b437d2630263fb84fcafb0b6764de87976fc8fad2c0285609c5ea27545c2697b0361b3a55a511d8b9e4a729136ec47ddedc6cb5e38d0cecccd6  modem.b20
+9a6d3ef5a41cb1cc8617769d293d56fe383dc046b49bccefbb39354b9a2e15a3c3137746914f3fe9b3b87b9472fc1feb4069bd3b1a7dcb84f9b6e5bd390234ed  modem.b21
+d110f0adce477dde5f88c4d7da0b69dc1f641afc96e97e657f018c84d2944b35b990bba2ac7782389f8e588bfb6c53f96acfb330ffb192830066b3226050f2da  modem.b23
+c53b5999d64901f272428868a35c346eecda2b6575fcf66303d541429460d2e946f9ac85dd015a2caef2c7c3e7bcb9d9daf4dec55ff96b4272d02f0f0ccc4759  modem.b24
+39034c6478a3f3f41ab1cf9f4a283aae6ea0309e54dc1c9a0e933a78d0613d3b3b23efe875d983118bb93633a0ab0a5bfe74f8978dbc3fb2993feb83af865d00  modem.b25
+ab668d11b3c34d95b3e6a7a7c5521d28bd5cfc47a4df05e641ac77d778bb9950faf6c17b374b4bd00c24ab2e2bde2792c9246582a9ac8c6beef0a8018279b6f2  modem.b26
+8249972990ebefa24d98ec490a317174628323fe85e168ef4700a8f0cb81d4622a6b66d36b2d29ba66a1fa1038668a6606517c6a08877b843d0c010a21b8b8f1  modem.b27
+071f4228284857ef1fdc045cc8c12f7a551551d5c1c54ac9752d511c7c5eff42c442f02c412be7c6916929ae142de91a0054a1a646dcac9d488a68e430e1c858  modem.b28
+86b8a09d4db0a51987e2714d5dc33ad67452785b05085042ccfb8b448edc40a1d6b9cb3227aeb770a5bee388affdfea3e0b306b5a5543c144bf7912dbe1e10cb  modem.b29
+c6e6e05cca9e8fb500a9baf3d590937b0f97e541824d286da736457faa75216cd82f0e9e5d05bb098f2677abe6b1e0a9700dc3aeb44316227de4a91d91354f4d  modem.b30
+b7e54b9440794e9842b37052b2062e4a31aaf9d9bc090b8219f4affb5bb63771f14466d0f85a341bc3523077a046fa96cee18c098a93e726569f3ed6c89beb85  modem.b31
+"
+

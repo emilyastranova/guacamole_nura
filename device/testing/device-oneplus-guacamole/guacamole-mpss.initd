@@ -1,0 +1,26 @@
+#!/sbin/openrc-run
+
+name="MPSS remoteproc"
+description="Start Qualcomm MPSS modem processor for WCN3990 WiFi"
+
+depend() {
+	need rmtfs
+	after pd-mapper tqftpserv
+}
+
+start() {
+	ebegin "Booting MPSS remoteproc"
+	echo start > /sys/class/remoteproc/remoteproc0/state || { eend 1; return 1; }
+	local timeout=30
+	while [ $timeout -gt 0 ]; do
+		state=$(cat /sys/class/remoteproc/remoteproc0/state 2>/dev/null)
+		[ "$state" = "running" ] && break
+		[ "$state" = "crashed" ] && { eend 1 "MPSS crashed"; return 1; }
+		sleep 1
+		timeout=$((timeout - 1))
+	done
+	[ "$state" = "running" ]
+	eend $? "MPSS failed to boot (state: $state)"
+}
+
+

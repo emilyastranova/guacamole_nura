@@ -1,0 +1,54 @@
+#!/sbin/openrc-run
+
+name="Battery charge control"
+description="Limit battery charging and (server mode) inhibit suspend"
+
+: ${CHG_MIN:=40}
+: ${CHG_MAX:=80}
+: ${CHG_CURRENT_UA:=1500000}
+: ${KEEP_AWAKE:=yes}
+
+CURRENT_MAX="/sys/class/power_supply/pm8150b-charger/current_max"
+PIDFILE="/run/guacamole-chgctrl.pid"
+DAEMON="/usr/libexec/guacamole-chgctrl"
+WAKE_LOCK="/sys/power/wake_lock"
+WAKE_UNLOCK="/sys/power/wake_unlock"
+WAKE_LOCK_NAME="guacamole_chgctrl"
+
+depend() {
+	after localmount
+}
+
+start() {
+	ebegin "Starting battery charge control (resume ${CHG_MIN}%, stop ${CHG_MAX}%)"
+	CHG_MIN="$CHG_MIN" CHG_MAX="$CHG_MAX" CHG_CURRENT_UA="$CHG_CURRENT_UA" \
+		start-stop-daemon --start --background --make-pidfile --pidfile "$PIDFILE" \
+		--exec "$DAEMON"
+	local rc=$?
+
+	# Permanently plugged in == server: hold a kernel wake lock so nothing
+	# (sxmo autosuspend, swayidle, etc.) can drop the box into s2idle and take
+	# LAN services offline. Blocks at the kernel gate, independent of trigger.
+	if [ "$KEEP_AWAKE" = "yes" ] && [ -w "$WAKE_LOCK" ]; then
+		einfo "Server mode: holding wake lock '$WAKE_LOCK_NAME' (suspend inhibited)"
+		echo "$WAKE_LOCK_NAME" > "$WAKE_LOCK"
+	fi
+
+	eend $rc
+}
+
+stop() {
+	ebegin "Stopping battery charge control"
+	start-stop-daemon --stop --pidfile "$PIDFILE" --quiet
+	local rc=$?
+	echo "$CHG_CURRENT_UA" > "$CURRENT_MAX" 2>/dev/null
+
+	# Release the wake lock so normal phone-style suspend can resume.
+	if [ -w "$WAKE_UNLOCK" ]; then
+		echo "$WAKE_LOCK_NAME" > "$WAKE_UNLOCK" 2>/dev/null
+	fi
+
+	eend $rc
+}
+
+
