@@ -12,8 +12,18 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 echo "=== OnePlus 7 Pro Fastboot Helper ==="
 
 if ! command -v fastboot &> /dev/null; then
-    echo "Error: fastboot command not found."
-    exit 1
+    echo "Notice: host 'fastboot' not found in PATH."
+    echo "Using 'pmbootstrap flasher' (runs fastboot inside native chroot)..."
+    if [ "$ACTION" == "test" ]; then
+        echo "Executing: pmbootstrap flasher boot"
+        exec pmbootstrap flasher boot
+    elif [ "$ACTION" == "flash" ]; then
+        echo "Executing: pmbootstrap flasher flash_kernel"
+        exec pmbootstrap flasher flash_kernel
+    else
+        echo "Invalid option: $ACTION. Use 'test' or 'flash'."
+        exit 1
+    fi
 fi
 
 echo "Checking fastboot devices..."
