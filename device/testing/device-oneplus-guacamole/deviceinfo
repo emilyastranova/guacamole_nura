@@ -1,6 +1,5 @@
 # Reference: <https://postmarketos.org/deviceinfo>
-# Please use double quotes only. You can source this file in shell
-# scripts.
+# Please use double quotes only. You can source this file in shell scripts.
 
 deviceinfo_format_version="0"
 deviceinfo_name="OnePlus 7 Pro"
@@ -19,6 +18,9 @@ deviceinfo_screen_height="1440"
 deviceinfo_flash_method="fastboot"
 
 deviceinfo_generate_bootimg="true"
+deviceinfo_header_version="2"
+deviceinfo_append_dtb="false"
+deviceinfo_flash_offset_dtb="0x01f00000"
 deviceinfo_flash_offset_base="0x00000000"
 deviceinfo_flash_offset_kernel="0x00008000"
 deviceinfo_flash_offset_ramdisk="0x01000000"
@@ -28,9 +30,6 @@ deviceinfo_flash_pagesize="4096"
 
 # Kernel options
 deviceinfo_dtb="qcom/sm8150-oneplus-guacamole"
-deviceinfo_append_dtb="true"
 
 # Required for devices using UFS as storage (instead of e.g. eMMC)
 deviceinfo_rootfs_image_sector_size="4096"
-
-

@@ -15,7 +15,11 @@ if ! command -v adb &> /dev/null; then
 fi
 
 echo "Connecting to device..."
-adb wait-for-device
+STATE=$(adb get-state 2>/dev/null || true)
+if [ "$STATE" != "device" ] && [ "$STATE" != "recovery" ]; then
+    echo "Waiting for device or recovery..."
+    adb wait-for-any-recovery 2>/dev/null || adb wait-for-any-device 2>/dev/null || true
+fi
 
 echo "Mounting pstore if needed..."
 adb shell "mount -t pstore pstore /sys/fs/pstore 2>/dev/null || true"

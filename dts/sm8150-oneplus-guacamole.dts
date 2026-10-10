@@ -16,6 +16,9 @@
 	model = "OnePlus 7 Pro";
 	compatible = "oneplus,guacamole", "oneplus,oneplus7", "qcom,sm8150";
 
+	qcom,msm-id = <0x153 0x20000>;
+	qcom,board-id = <0x08 0x00>;
+
 	aliases {
 		display0 = &framebuffer0;
 	};
@@ -27,8 +30,7 @@
 		stdout-path = "display0";
 
 		/*
-		 * hack: Use framebuffer setup by the bootloader for simplefb.
-		 * the address is taken from the bootloader config (strings xbl.img | grep "Display Reserved")
+		 * Use framebuffer setup by the bootloader for simplefb.
 		 */
 		framebuffer0: framebuffer@9C000000 {
 			compatible = "simple-framebuffer";
@@ -38,16 +40,29 @@
 			stride = <(1440 * 4)>;
 			format = "a8r8g8b8";
 			status = "okay";
-
 		};
 	};
 
 	reserved-memory {
-	// hack: Bootloader framebuffer memory region
-		fb_mem: memory@a1a10000 {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		/* Bootloader framebuffer memory region */
+		fb_mem: memory@9c000000 {
 			compatible = "removed-dma-pool";
 			no-map;
 			reg = <0 0x9C000000 0 (1440 * 3120 * 4)>;
+		};
+
+		/* Stock OnePlus 7 Pro ramoops pstore region */
+		ramoops: ramoops@a9800000 {
+			compatible = "ramoops";
+			reg = <0x0 0xa9800000 0x0 0x400000>;
+			record-size = <0x40000>;
+			console-size = <0x40000>;
+			ftrace-size = <0x40000>;
+			pmsg-size = <0x200000>;
 		};
 	};
 };

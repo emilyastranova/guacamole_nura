@@ -15,7 +15,11 @@ if ! command -v adb &> /dev/null; then
 fi
 
 echo "[1/4] Checking ADB connection..."
-adb wait-for-device
+STATE=$(adb get-state 2>/dev/null || true)
+if [ "$STATE" != "device" ] && [ "$STATE" != "recovery" ]; then
+    echo "Waiting for device or recovery..."
+    adb wait-for-any-recovery 2>/dev/null || adb wait-for-any-device 2>/dev/null || true
+fi
 adb root 2>/dev/null || echo "Note: If adb root fails, ensure adbd has root permissions or TWRP is booted."
 
 echo "[2/4] Dumping /sys/firmware/fdt to /sdcard/device.dtb..."
