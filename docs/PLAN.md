@@ -67,12 +67,12 @@ flowchart TD
 ### Phase 1: Environment Setup & Package Linking
 - [x] Configure repository directory structure (`device/`, `dts/`, `firmware/`, `scripts/`, `docs/`).
 - [x] Pull and import upstream device tree and device integration packages.
-- [ ] Initialize `pmbootstrap init`:
+- [x] Initialize `pmbootstrap` configuration (`~/.config/pmbootstrap_v3.cfg`).
   - Work path: `~/.local/var/pmbootstrap`
   - Vendor: `oneplus`
   - Device: `guacamole`
   - Kernel: `postmarketos-qcom-sm8150`
-- [ ] Symlink local package folders into `aports`:
+- [x] Symlink local package folders into `aports`:
   - `device/testing/device-oneplus-guacamole`
   - `device/testing/firmware-oneplus-guacamole`
   - `device/testing/linux-postmarketos-qcom-sm8150`
@@ -80,21 +80,20 @@ flowchart TD
 ---
 
 ### Phase 2: Kernel Build & DTB Verification
-- [ ] Build SM8150 mainline kernel using `linux-postmarketos-qcom-sm8150`:
-  - Kernel source: `https://gitlab.postmarketos.org/soc/qualcomm-sm8150/linux` (branch `sm8150/6.17`).
-  - Verify that `sm8150-oneplus-guacamole.dtb` is generated during `make dtbs`.
-- [ ] Run `pmbootstrap build linux-postmarketos-qcom-sm8150`.
-- [ ] Run `pmbootstrap build firmware-oneplus-guacamole`.
-- [ ] Run `pmbootstrap build device-oneplus-guacamole`.
+- [x] Verified `sm8150-oneplus-guacamole.dtb` in mainline kernel tree.
+- [x] Run `pmbootstrap build firmware-oneplus-guacamole` (Completed: package built).
+- [x] Run `pmbootstrap build device-oneplus-guacamole` (Completed: package built).
+- [x] Run `pmbootstrap install` (Completed: rootfs assembled, mkinitfs generated).
 
 ---
 
 ### Phase 3: Fastboot Test-Boot & SimpleFB Console
-- [ ] Generate boot image:
-  - `pmbootstrap flasher boot` or `pmbootstrap export`.
+- [x] Generate and export boot image:
+  - Exported to `build/boot.img` and `build/dtbs/sm8150-oneplus-guacamole.dtb`.
+  - Analyzed and verified via `pmbootstrap bootimg_analyze`.
 - [ ] Non-destructive boot testing:
   - Put OnePlus 7 Pro into Fastboot mode.
-  - Test boot with `./scripts/flash_boot.sh test` (`fastboot boot boot.img`).
+  - Test boot with `./scripts/flash_boot.sh test` (or `pmbootstrap flasher boot`).
 - [ ] Verify SimpleFB display handoff (OnePlus logo -> Linux splash / tty console).
 - [ ] If reboot occurs, use `./scripts/ramoops.sh` to retrieve `/sys/fs/pstore` panic logs.
 
