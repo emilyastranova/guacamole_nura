@@ -3,7 +3,7 @@ import os
 import subprocess
 
 def patch():
-    with open("/tmp/base_guacamole.dts") as f:
+    with open("/tmp/base_guacamole_r4.dts") as f:
         text = f.read()
 
     # 1. Fix memory@85d00000 -> 0x85e00000 (xbl_aop_mem)
@@ -14,16 +14,24 @@ def patch():
     text = text.replace("memory@86200000 {\n\t\t\treg = <0x00 0x86200000 0x00 0x3900000>;",
                         "memory@86200000 {\n\t\t\treg = <0x00 0x86200000 0x00 0x5500000>;")
 
-    # 3. Fix splash size in memory@a1a10000 to 0x2400000 (36 MB)
-    text = text.replace("memory@a1a10000 {\n\t\t\tcompatible = \"removed-dma-pool\";\n\t\t\tno-map;\n\t\t\treg = <0x00 0x9c000000 0x00 0x1123800>;",
-                        "memory@a1a10000 {\n\t\t\tcompatible = \"removed-dma-pool\";\n\t\t\tno-map;\n\t\t\treg = <0x00 0x9c000000 0x00 0x2400000>;")
+    # 5. Add missing hardware security regions (bootloader_log, cdsp_sec, ramoops, param, mtp)
+    target_end_rm = """\t\tmemory@f2901000 {
+\t\t\tcompatible = "qcom,rmtfs-mem";
+\t\t\treg = <0x00 0xf2901000 0x00 0x200000>;
+\t\t\tno-map;
+\t\t\tqcom,client-id = <0x01>;
+\t\t\tqcom,vmid = <0x0f>;
+\t\t};
+\t};"""
 
-    # 4. Fix chosen framebuffer reg to match continuous splash
-    text = text.replace("framebuffer@9C000000 {\n\t\t\tcompatible = \"simple-framebuffer\";\n\t\t\treg = <0x00 0x9c000000 0x00 0x1123800>;",
-                        "framebuffer@9C000000 {\n\t\t\tcompatible = \"simple-framebuffer\";\n\t\t\treg = <0x00 0x9c000000 0x00 0x2400000>;")
+    missing_regions = """\t\tmemory@f2901000 {
+\t\t\tcompatible = "qcom,rmtfs-mem";
+\t\t\treg = <0x00 0xf2901000 0x00 0x200000>;
+\t\t\tno-map;
+\t\t\tqcom,client-id = <0x01>;
+\t\t\tqcom,vmid = <0x0f>;
+\t\t};
 
-    # 5. Add missing hardware security regions (cdsp_sec_regions, param_mem, mtp_mem, bootloader_log, ramoops)
-    missing_regions = """
 \t\tbootloader_log_mem@9fff7000 {
 \t\t\treg = <0x00 0x9fff7000 0x00 0x9000>;
 \t\t\tno-map;
@@ -53,23 +61,9 @@ def patch():
 \t\t\treg = <0x00 0xac300000 0x00 0xb00000>;
 \t\t\tno-map;
 \t\t};
-\t};
-"""
-
-    target = """\t\tmemory@a1a10000 {
-\t\t\tcompatible = "removed-dma-pool";
-\t\t\tno-map;
-\t\t\treg = <0x00 0x9c000000 0x00 0x2400000>;
-\t\t};
 \t};"""
-
-    assert target in text, "Target end of reserved-memory not found"
-    text = text.replace(target, """\t\tmemory@a1a10000 {
-\t\t\tcompatible = "removed-dma-pool";
-\t\t\tno-map;
-\t\t\treg = <0x00 0x9c000000 0x00 0x2400000>;
-\t\t};
-""" + missing_regions, 1)
+    assert target_end_rm in text, "Target end of reserved memory not found"
+    text = text.replace(target_end_rm, missing_regions, 1)
 
     # 6. Add Qualcomm bootloader matching IDs
     root_marker = "model = \"OnePlus 7 Pro\";"

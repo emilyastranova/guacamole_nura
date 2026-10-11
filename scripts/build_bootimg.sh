@@ -12,12 +12,14 @@ mkdir -p "${OUTPUT_DIR}"
 
 # 1. Prepare uncompressed kernel
 echo "[1/4] Decompressing kernel Image..."
-if [ -f "${CHROOT_ROOTFS}/boot/vmlinuz" ]; then
+if [ -f "${WORKSPACE_DIR}/build/kernel_r4/boot/vmlinuz" ]; then
+    zcat "${WORKSPACE_DIR}/build/kernel_r4/boot/vmlinuz" > /tmp/Image
+elif [ -f "${CHROOT_ROOTFS}/boot/vmlinuz" ]; then
     zcat "${CHROOT_ROOTFS}/boot/vmlinuz" > /tmp/Image
 elif [ -f "${CHROOT_ROOTFS}/boot/Image" ]; then
     cp "${CHROOT_ROOTFS}/boot/Image" /tmp/Image
 else
-    echo "ERROR: Kernel not found in chroot!"
+    echo "ERROR: Kernel not found!"
     exit 1
 fi
 
@@ -27,7 +29,11 @@ python3 "${WORKSPACE_DIR}/scripts/patch_dtb.py"
 
 # 3. Locate initramfs
 echo "[3/4] Locating initramfs..."
-INITRAMFS="${CHROOT_ROOTFS}/boot/initramfs"
+if [ -f "/tmp/device_initramfs_r4" ]; then
+    INITRAMFS="/tmp/device_initramfs_r4"
+else
+    INITRAMFS="${CHROOT_ROOTFS}/boot/initramfs"
+fi
 if [ ! -f "${INITRAMFS}" ]; then
     echo "ERROR: initramfs not found at ${INITRAMFS}!"
     exit 1
