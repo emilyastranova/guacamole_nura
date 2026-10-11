@@ -2046,11 +2046,12 @@
 			nvmem-cells = <0x76>;
 			nvmem-cell-names = "speed_bin";
 			#cooling-cells = <0x02>;
-			status = "disabled";
+			status = "okay";
 			phandle = <0x100>;
 
 			zap-shader {
 				memory-region = <0x77>;
+				firmware-name = "qcom/a640_zap.mdt";
 			};
 
 			opp-table {
@@ -2107,7 +2108,7 @@
 			power-domain-names = "cx", "gx";
 			iommus = <0x73 0x05 0x400>;
 			operating-points-v2 = <0x79>;
-			status = "disabled";
+			status = "okay";
 			phandle = <0x75>;
 
 			opp-table {
