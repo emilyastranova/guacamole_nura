@@ -3,7 +3,11 @@ import os
 import subprocess
 
 def patch():
-    with open("/tmp/base_guacamole_r4.dts") as f:
+    workspace_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    dts_path = os.path.join(workspace_dir, "base_guacamole_working.dts")
+    if not os.path.exists(dts_path):
+        dts_path = "/tmp/base_guacamole_r7_test.dts"
+    with open(dts_path) as f:
         text = f.read()
 
     # 1. Fix memory@85d00000 -> 0x85e00000 (xbl_aop_mem)

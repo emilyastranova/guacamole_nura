@@ -12,8 +12,8 @@ mkdir -p "${OUTPUT_DIR}"
 
 # 1. Prepare uncompressed kernel
 echo "[1/4] Decompressing kernel Image..."
-if [ -f "${WORKSPACE_DIR}/build/kernel_r4/boot/vmlinuz" ]; then
-    zcat "${WORKSPACE_DIR}/build/kernel_r4/boot/vmlinuz" > /tmp/Image
+if [ -f "${WORKSPACE_DIR}/build/kernel_r6/boot/vmlinuz" ]; then
+    zcat "${WORKSPACE_DIR}/build/kernel_r6/boot/vmlinuz" > /tmp/Image
 elif [ -f "${CHROOT_ROOTFS}/boot/vmlinuz" ]; then
     zcat "${CHROOT_ROOTFS}/boot/vmlinuz" > /tmp/Image
 elif [ -f "${CHROOT_ROOTFS}/boot/Image" ]; then
