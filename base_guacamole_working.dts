@@ -4227,6 +4227,23 @@
 					interrupt-controller;
 					#interrupt-cells = <0x02>;
 					phandle = <0xd4>;
+
+					/* Volume keys, as in the stock key_vol_{up,down}_default states */
+					vol_up_default: key-vol-up-state {
+						pins = "gpio6";
+						function = "normal";
+						input-enable;
+						bias-pull-up;
+						power-source = <0x01>;
+					};
+
+					vol_down_default: key-vol-down-state {
+						pins = "gpio7";
+						function = "normal";
+						input-enable;
+						bias-pull-up;
+						power-source = <0x01>;
+					};
 				};
 			};
 
@@ -5224,6 +5241,32 @@
 			vdd-1.3-rfa-supply = <&vreg_l2c_1p3>;
 			vdd-3.3-ch0-supply = <&vreg_l11c_3p3>;
 			status = "okay";
+		};
+	};
+
+	/* Volume keys on PM8150 GPIO 6/7 (active low), as in the stock gpio_keys node */
+	gpio-keys {
+		compatible = "gpio-keys";
+		label = "gpio-keys";
+		pinctrl-names = "default";
+		pinctrl-0 = <&vol_up_default &vol_down_default>;
+
+		key-vol-up {
+			label = "volume_up";
+			gpios = <0xd4 6 1>;
+			linux,input-type = <1>;
+			linux,code = <115>;
+			wakeup-source;
+			debounce-interval = <15>;
+		};
+
+		key-vol-down {
+			label = "volume_down";
+			gpios = <0xd4 7 1>;
+			linux,input-type = <1>;
+			linux,code = <114>;
+			wakeup-source;
+			debounce-interval = <15>;
 		};
 	};
 

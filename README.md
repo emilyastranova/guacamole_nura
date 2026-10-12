@@ -36,7 +36,9 @@ This repository contains the bringup workspace, kernel patches, device tree sour
 | **Storage (UFS)** | :white_check_mark: Working | `ufshcd-qcom` | Capped at HS-G3 (kernel patch `0010`): HS-G4 link errors silently dropped writes; rootfs is a pmOS image on `userdata` |
 | **USB Peripheral** | :white_check_mark: Working | `dwc3-qcom` / USB gadget | USB Type-C OTG + CDC NCM / RNDIS gadget for SSH (`user@172.16.42.1`) |
 | **Battery & Charging** | :construction: Partial | `bq27411` fuel gauge @ `0x55` + PM8150B charger | Percentage, voltage, current and temperature work; charger driver not enabled yet (needs SMB5 limit fix); see "Battery & Charging" in `docs/PLAN.md` |
-| **Volume Keys** | :x: Not Working | PMIC / GPIO keys | Not yet enabled; see "Buttons" in `docs/PLAN.md` |
+| **Auto-rotate** | :x: Not Working | SLPI sensor DSP (SSC) | Accelerometer is behind the sensor DSP; see "Sensors" in `docs/PLAN.md` |
+| **Camera** | :x: Not Working | SM8150 CAMSS / CCI | Not started; see "Camera" in `docs/PLAN.md` |
+| **Volume Keys** | :white_check_mark: Working | `gpio-keys` (PM8150 GPIO 6/7) | Volume up/down report `KEY_VOLUMEUP`/`KEY_VOLUMEDOWN` |
 | **GPU Acceleration** | :white_check_mark: Working | Adreno 640 / Mesa Freedreno & Turnip | GMU v2.0.261 + ZAP shader loaded; native OpenGL ES 3.2 and Vulkan 1.3 |
 | **Wi-Fi** | :white_check_mark: Working | `ath10k_snoc` (WCN3990) | 2.4 and 5 GHz, DHCP and internet; OxygenOS 12-era WLAN firmware + kernel patch `0009`. Stable MAC and WoWLAN pending |
 | **Bluetooth** | :x: Not Working | `hci_qca` (WCN3990) | Not yet enabled; see "Wi-Fi, Bluetooth & Modem Bringup" in `docs/PLAN.md` |
@@ -119,7 +121,8 @@ guacamole_nura/
   - Give `wlan0` a stable MAC address and test WoWLAN.
   - Enable WCN3990 Bluetooth (`hci_qca`) and package its firmware.
   - Validate SIM, SMS, mobile data and calls via ModemManager.
-- [ ] **Volume keys** (see "Buttons" in `docs/PLAN.md`).
+- [ ] **Auto-rotate** (see "Sensors" in `docs/PLAN.md`).
+- [ ] **Camera** (see "Camera" in `docs/PLAN.md`).
 - [ ] **Battery & Charging** (see "Battery & Charging" in `docs/PLAN.md`):
   - Port the SMB5 charge-limit fix before enabling the PM8150B charger.
   - Rework `guacamole-chgctrl.daemon` for the `bq27411-0` gauge and mainline charger controls.

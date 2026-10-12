@@ -33,8 +33,10 @@ flowchart TD
     F --> H[Audio Subsystem QDSP6 & Codec - SPEAKERS & MIC WORKING]
     H --> I[Wi-Fi, Bluetooth & Modem - NOT WORKING]
     I --> J[Battery & Charging - NOT WORKING]
-    J --> L[Volume Keys - NOT WORKING]
-    L --> K[Upstreaming & Maintenance - PLANNED]
+    J --> L[Volume Keys - WORKING]
+    L --> M[Auto-rotate / SLPI sensors - NOT WORKING]
+    M --> N[Camera - NOT WORKING]
+    N --> K[Upstreaming & Maintenance - PLANNED]
 ```
 
 ---
@@ -148,6 +150,7 @@ Wi-Fi connects on 2.4 GHz and 5 GHz. Bluetooth and cellular are not working yet.
   - Kernel patch `0009`: skip the WMI quiet-mode command on WCN3990 (HL3.2 firmware crashed on it), backported from the linux-wireless series "ath10k: WCN3990 firmware workarounds for WLAN.HL.3.2". Its forced-passive-5 GHz half is not included.
   - Do not test by unbinding/rebinding `ath10k_snoc` or restarting a running modem: the MSA region stays assigned to the modem (`qcom_scm` assign `-22`), and rebooting from that state has put the phone into Qualcomm crashdump mode.
   - Still to do: stable MAC address (`ath10k` picks a random one each boot), WoWLAN sleep/wake, throughput; `rmtfs` sometimes starts before `remoteproc0` registers (`failed to update start state: Invalid argument`) and the modem then needs a manual `echo start`.
+- [ ] **Crashdump on reboot**: `reboot bootloader` sometimes drops the phone into Qualcomm crashdump mode (2026-10-11, at least twice; recover with Power + Volume Up). Both times the modem was running with Wi-Fi active, so the MSA region was assigned to the modem VM, and once the modem had been started by hand after a failed authentication. Suspect the remoteproc/ath10k shutdown path: mainline does not reclaim MSA permissions before the modem stops. Leads: the OnePlus 7T Pro carries two "ath10k MSA reclaim" patches (`hotdog-linux-bringup/docs/upstream-submissions.md`). To isolate, compare reboots with Wi-Fi off, with the modem stopped first (`echo stop > /sys/class/remoteproc/remoteproc0/state`), and with ramoops/pstore captured afterwards (`scripts/ramoops.sh`).
 - [ ] **Move to the OxygenOS 12 modem**: rework reserved memory so `mpss_mem` covers 160 MiB (moves `venus_mem` and the following regions; see the NetHunter Pro guacamole patch 0008).
 - [ ] **WCN3990 Bluetooth (`hci_qca`)**
   - Enable the `qcom,wcn3990-bt` node on its QUP UART with the correct WCN3990 regulators.
@@ -183,11 +186,20 @@ Battery percentage works through the external fuel gauge. The PM8150B charger dr
 - [ ] **Processor name**: arm64 `/proc/cpuinfo` has no `model name`, so the field is blank. It should read "Qualcomm Snapdragon 855 (SM8150)". Needs a libgtop or gnome-control-center fallback, or a local kernel patch that adds `model name` for `qcom,sm8150`.
 - [ ] **Graphics name**: Mesa freedreno reports the GL renderer as `FD640`. It should read "Qualcomm Adreno 640". Needs a Mesa renderer-name change or a gnome-control-center `info_cleanup` rule.
 
+### Sensors
+- [ ] **Auto-rotate (accelerometer)**
+  - The stock device tree has no accelerometer on an AP-visible bus; the motion sensors sit behind the SLPI sensor DSP (Qualcomm SSC).
+  - Needs the SLPI remoteproc, the sensor firmware/registry, and an SSC client in userspace feeding `iio-sensor-proxy`. Reference: `hotdog-linux-bringup/docs/evidence/*slpi*`, `*sensor*` (OnePlus 7T Pro).
+
+### Camera
+- [ ] **Cameras**
+  - The stock device tree describes several `qcom,cam-sensor` slots (rear main/wide/telephoto and the pop-up front camera) on the CCI buses.
+  - Needs SM8150 CAMSS support, the CCI controllers, camera PMIC rails and sensor drivers. Reference: `hotdog-linux-bringup` patches `0055`–`0064` (OnePlus 7T Pro: CAMSS for SM8150, CCI, `s5k3m5` driver, slot identification); the 7 Pro sensor models still need identifying from the stock DT/vendor partition.
+  - The pop-up front camera also needs its motor driver.
+
 ### Buttons
-- [ ] **Volume keys**
-  - Volume up/down do not work yet.
-  - Reference: `hotdog-linux-bringup` patch `0018-arm64-dts-hotdog-enable-volume-keys.patch` (OnePlus 7T Pro); confirm the key GPIOs against `extracted_dtb/device.dts`.
-  - Verify key events with `evtest` and volume changes in Phosh.
+- [x] **Volume keys** — verified 2026-10-11
+  - `gpio-keys` on PM8150 GPIO 6 (volume up) and GPIO 7 (volume down), active low, pull-up, `power-source = <1>`, as in the stock `gpio_keys` node. The OnePlus 7T Pro uses the PON `resin` key for volume down instead; the 7 Pro does not.
 
 ---
 
