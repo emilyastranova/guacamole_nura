@@ -61,7 +61,7 @@ mkbootimg \
     --pagesize 4096 \
     --os_version 10.0.0 \
     --os_patch_level 2021-01 \
-    --cmdline "console=tty0 console=ttyMSM0,115200n8 earlycon ramoops.mem_address=0xa9800000 ramoops.mem_size=0x400000 ramoops.record_size=0x40000 ramoops.console_size=0x40000 ramoops.pmsg_size=0x200000 pmOS_loglevel=8 PMOS_NO_OUTPUT_REDIRECT" \
+    --cmdline "console=tty0 console=ttyMSM0,115200n8 earlycon ramoops.mem_address=0xa9800000 ramoops.mem_size=0x400000 ramoops.record_size=0x40000 ramoops.console_size=0x40000 ramoops.pmsg_size=0x200000 pmOS_loglevel=8 PMOS_NO_OUTPUT_REDIRECT scsi_mod.scan=sync" \
     -o "${BOOTIMG}"
 
 # 5. Append AVB footer for Qualcomm ABL / libavb authentication

@@ -47,7 +47,7 @@ The device operates on an A/B dual-slot scheme:
 
 ### Storage Layout
 Mainline Linux exposes the UFS LUNs as standard SCSI disks:
-- `/dev/sda`: Main user data and OS partitions (LUN 0)
+- `/dev/sda`: Main user data and OS partitions (LUN 0). The `sdX` names are not stable across boots; LUN 0 can enumerate as a later letter.
 - `/dev/sdb`: Boot partition 1 / xbl_a (LUN 1)
 - `/dev/sdc`: Boot partition 2 / xbl_b (LUN 2)
 - `/dev/sdd`: RPMB (LUN 3)

@@ -72,7 +72,8 @@ flowchart TD
 
 ### UFS Storage, Rootfs & USB Gadget Networking
 - [x] UFS 3.0 detection verified via `ufshcd-qcom` (`/dev/sda` through `/dev/sdf`).
-- [x] Rootfs deployed on `/dev/sda13` (inactive slot `_a`), completely preserving stock Android on slot `_b`.
+- [x] Rootfs deployed on `/dev/sda13` (`system_a`, inactive slot `_a`), preserving stock Android on slot `_b`. It was later reinstalled on `userdata` (LUN 0, partition 19) to use the full storage.
+- [ ] Stable disk naming: LUN 0 is not always `sda` because the LUNs probe asynchronously, and GNOME Settings then reports the first LUN's size (for example 8.4 MB). Test `scsi_mod.scan=sync`.
 - [x] Configured USB Ethernet gadget networking (`cdc_ncm` / `rndis`).
 - [x] Direct SSH access operational at `ssh user@172.16.42.1`.
 

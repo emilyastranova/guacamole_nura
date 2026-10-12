@@ -54,6 +54,6 @@ Needs on the host: `dtc`, `mkbootimg`, `avbtool`, `fastboot`/`adb` (or `pmbootst
 - Do not enable the PM8150B charger (`charger@1000`) until `qcom_smbx.c` has the SMB5 limit fix (hotdog patch `0020`). Without it, the driver programs about 4.85 V float voltage.
 - The fuel gauge is `ti,bq27411` on `i2c@a80000`. Never add `monitored-battery` to it, because that lets the driver write the gauge's data memory.
 - ABL splices the UFS `dtbo_<slot>` partition into whatever DTB it boots. The active slot's DTBO has been zeroed (the originals are in `backups/`). If boots hang silently with no early output, check this first.
-- Linux rootfs is on `/dev/sda13` (slot `_a`). Stock Android remains on slot `_b`.
+- The Linux rootfs is a pmOS image on the `userdata` partition (UFS LUN 0, partition 19), with the boot and root subpartitions mounted through `loop0` and referenced by UUID in `/etc/fstab`. Stock Android stays on slot `_b`. `sdX` names are not stable: the six UFS LUNs probe asynchronously, so LUN 0 is not always `sda`. Use `/dev/disk/by-partlabel/` or SCSI addresses (`0:0:0:N`) instead.
 - UFS uses 4096-byte sectors (`deviceinfo_rootfs_image_sector_size`).
 - Large binaries (`*.img`, the TWRP zip, `stock_boot*.img`) sit in the repo root and are gitignored. Never commit them.
