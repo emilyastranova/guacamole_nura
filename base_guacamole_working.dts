@@ -628,6 +628,7 @@
 		scm {
 			compatible = "qcom,scm-sm8150", "qcom,scm";
 			#reset-cells = <0x01>;
+			qcom,dload-mode = <0x534 0x13000>;
 		};
 	};
 
@@ -2040,6 +2041,12 @@
 		syscon@1f60000 {
 			compatible = "qcom,sm8150-tcsr", "syscon";
 			reg = <0x00 0x1f60000 0x00 0x20000>;
+		};
+
+		syscon@1fc0000 {
+			compatible = "qcom,sm8150-tcsr", "syscon";
+			reg = <0x00 0x1fc0000 0x00 0x30000>;
+			phandle = <0x534>;
 		};
 
 		remoteproc@2400000 {

@@ -42,7 +42,7 @@ This repository contains the bringup workspace, kernel patches, device tree sour
 | **Camera** | :x: Not Working | SM8150 CAMSS / CCI | Not started; see "Camera" in `docs/PLAN.md` |
 | **Volume Keys** | :white_check_mark: Working | `gpio-keys` (PM8150 GPIO 6/7) | Volume up/down report `KEY_VOLUMEUP`/`KEY_VOLUMEDOWN` |
 | **GPU Acceleration** | :white_check_mark: Working | Adreno 640 / Mesa Freedreno & Turnip | GMU v2.0.261 + ZAP shader loaded; native OpenGL ES 3.2 and Vulkan 1.3 |
-| **Wi-Fi** | :white_check_mark: Working | `ath10k_snoc` (WCN3990) | 2.4 and 5 GHz, DHCP and internet; OxygenOS 12-era WLAN firmware + kernel patch `0009`. Rebooting with Wi-Fi on can enter Qualcomm crashdump mode (see below). Stable MAC and WoWLAN pending |
+| **Wi-Fi** | :white_check_mark: Working | `ath10k_snoc` (WCN3990) | 2.4 and 5 GHz, DHCP and internet; OxygenOS 12-era WLAN firmware + kernel patch `0009`. Stable MAC and WoWLAN pending |
 | **Bluetooth** | :white_check_mark: Working | `hci_qca` (WCN3990) on UART13 | Scanning and HID devices; stable address from the factory Wi-Fi MAC; audio profiles untested |
 | **Modem / MPSS** | :construction: DSP running | Hexagon remoteproc / PAS | Modem DSP runs and hosts the WLAN firmware; cellular (ModemManager, SIM, calls, data) not working; see "Wi-Fi, Bluetooth & Modem Bringup" in `docs/PLAN.md` |
 | **Audio** | :white_check_mark: Speakers & Mic | QDSP6 ADSP + 2x NXP TFA9874 (QUAT MI2S) + WCD9340 (SLIMbus) | Stereo speakers and internal mic working via UCM2; earpiece/call audio and speaker protection pending |
@@ -63,15 +63,8 @@ The `s6sy761` digitizer IC on the OnePlus 7 Pro is powered by **PM8150 LDO 17** 
 ### Speaker Amplifiers
 The loudspeakers are not driven by the WCD9340 codec. Two NXP TFA9874 amplifiers (I2C `0x34` top/earpiece, `0x35` bottom, on `i2c@890000`) receive audio over `QUATERNARY_MI2S_RX` at S24_LE, 48 kHz. Their register profile matches the stock `/vendor/firmware/tfa98xx.cnt`. The WCD9340 on SLIMbus handles the microphones.
 
-### Crashdump on Reboot with Wi-Fi On
-> [!WARNING]
-> Rebooting while the Wi-Fi radio is on can drop the phone into Qualcomm crashdump mode instead of rebooting. Recover with Power + Volume Up. Until this is fixed, switch the radio off before every reboot or shutdown:
->
-> ```bash
-> sudo nmcli radio wifi off
-> ```
-
-The modem DSP hosts the WLAN firmware, and while Wi-Fi is active the MSA memory region is assigned to the modem. Mainline does not reclaim that assignment before the modem stops, which is the suspected cause. Reboots with the radio off have gone straight to fastboot every time so far. Investigation notes are under "Crashdump on reboot" in `docs/PLAN.md`.
+### Download-Mode Cookie and Reboot
+Qualcomm boot firmware sets a download-mode cookie in TCSR at boot, so any reset that Linux does not mark as clean ends in Qualcomm crashdump mode (`05c6:900e`) instead of a reboot. The SCM driver clears the cookie at probe and on clean shutdown, but only when the device tree describes the register with `qcom,dload-mode`. Without it the driver falls back to an SCM call that does not clear the cookie on SM8150, and reboots with Wi-Fi on (the modem hosting the active WLAN firmware) dropped into crashdump mode. The device tree now adds the TCSR syscon at `0x1fc0000` and `qcom,dload-mode = <&tcsr 0x13000>` on the `scm` node, following the OnePlus 7T Pro bringup (`hotdog-linux-bringup` patch `0098`). Reboots with Wi-Fi connected now return to fastboot normally.
 
 ### Wi-Fi and Bluetooth Firmware Source
 > [!NOTE]
