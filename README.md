@@ -41,7 +41,7 @@ This repository contains the bringup workspace, kernel patches, device tree sour
 | **Camera** | :x: Not Working | SM8150 CAMSS / CCI | Not started; see "Camera" in `docs/PLAN.md` |
 | **Volume Keys** | :white_check_mark: Working | `gpio-keys` (PM8150 GPIO 6/7) | Volume up/down report `KEY_VOLUMEUP`/`KEY_VOLUMEDOWN` |
 | **GPU Acceleration** | :white_check_mark: Working | Adreno 640 / Mesa Freedreno & Turnip | GMU v2.0.261 + ZAP shader loaded; native OpenGL ES 3.2 and Vulkan 1.3 |
-| **Wi-Fi** | :white_check_mark: Working | `ath10k_snoc` (WCN3990) | 2.4 and 5 GHz, DHCP and internet; OxygenOS 12-era WLAN firmware + kernel patch `0009`. Stable MAC and WoWLAN pending |
+| **Wi-Fi** | :white_check_mark: Working | `ath10k_snoc` (WCN3990) | 2.4 and 5 GHz, DHCP and internet; OxygenOS 12-era WLAN firmware + kernel patch `0009`. Rebooting with Wi-Fi on can enter Qualcomm crashdump mode (see below). Stable MAC and WoWLAN pending |
 | **Bluetooth** | :white_check_mark: Working | `hci_qca` (WCN3990) on UART13 | Scanning and HID devices; stable address from the factory Wi-Fi MAC; audio profiles untested |
 | **Modem / MPSS** | :construction: DSP running | Hexagon remoteproc / PAS | Modem DSP runs and hosts the WLAN firmware; cellular (ModemManager, SIM, calls, data) not working; see "Wi-Fi, Bluetooth & Modem Bringup" in `docs/PLAN.md` |
 | **Audio** | :white_check_mark: Speakers & Mic | QDSP6 ADSP + 2x NXP TFA9874 (QUAT MI2S) + WCD9340 (SLIMbus) | Stereo speakers and internal mic working via UCM2; earpiece/call audio and speaker protection pending |
@@ -61,6 +61,22 @@ The `s6sy761` digitizer IC on the OnePlus 7 Pro is powered by **PM8150 LDO 17** 
 
 ### Speaker Amplifiers
 The loudspeakers are not driven by the WCD9340 codec. Two NXP TFA9874 amplifiers (I2C `0x34` top/earpiece, `0x35` bottom, on `i2c@890000`) receive audio over `QUATERNARY_MI2S_RX` at S24_LE, 48 kHz. Their register profile matches the stock `/vendor/firmware/tfa98xx.cnt`. The WCD9340 on SLIMbus handles the microphones.
+
+### Crashdump on Reboot with Wi-Fi On
+> [!WARNING]
+> Rebooting while the Wi-Fi radio is on can drop the phone into Qualcomm crashdump mode instead of rebooting. Recover with Power + Volume Up. Until this is fixed, switch the radio off before every reboot or shutdown:
+>
+> ```bash
+> sudo nmcli radio wifi off
+> ```
+
+The modem DSP hosts the WLAN firmware, and while Wi-Fi is active the MSA memory region is assigned to the modem. Mainline does not reclaim that assignment before the modem stops, which is the suspected cause. Reboots with the radio off have gone straight to fastboot every time so far. Investigation notes are under "Crashdump on reboot" in `docs/PLAN.md`.
+
+### Wi-Fi and Bluetooth Firmware Source
+> [!NOTE]
+> The WCN3990 Wi-Fi firmware (`wlanmdsp.mbn`, `WLAN.HL.3.0.c8`), its board data (`board-2.bin`) and the Bluetooth firmware (`crbtfw21.tlv`, `crnv21.bin`) are currently extracted from a LineageOS 24 OTA with `scripts/extract_lineage_firmware.py`. The extraction step creates a local, gitignored tarball that `firmware-oneplus-guacamole` builds from, so the package cannot yet be built from public URLs alone. The modem itself still uses the OxygenOS 11 build.
+
+The public firmware in [sm8150-mainline/firmware-oneplus-sm8150](https://gitlab.com/sm8150-mainline/firmware-oneplus-sm8150) (`WLAN.HL.3.2.0`) failed station `vdev start` in earlier testing. That testing ran before the UFS HS-G3 cap, while the HS-G4 link was silently dropping writes, so the firmware files or rootfs may have been corrupted. Those results need to be repeated before ruling the GitLab firmware out. That repository carries no Bluetooth firmware; `linux-firmware` ships `qca/crbtfw21.tlv` and `qca/crnv21.bin` and is the public candidate for Bluetooth.
 
 ---
 
@@ -119,6 +135,7 @@ guacamole_nura/
   - Secondary microphones, speaker protection and default volume limits.
   - Settle on one sound server (PulseAudio vs PipeWire).
 - [ ] **Wi-Fi, Bluetooth & Modem Bringup** (see "Wi-Fi, Bluetooth & Modem Bringup" in `docs/PLAN.md`):
+  - (WIP) Re-test the sm8150-mainline GitLab Wi-Fi firmware (and the `linux-firmware` Bluetooth files) now that UFS writes are reliable; earlier failures may have come from storage corruption. If they work, drop the LineageOS extraction step.
   - Give `wlan0` a stable MAC address and test WoWLAN.
   - Validate SIM, SMS, mobile data and calls via ModemManager.
 - [ ] **Auto-rotate** (see "Sensors" in `docs/PLAN.md`).
