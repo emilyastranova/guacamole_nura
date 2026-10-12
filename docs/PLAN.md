@@ -174,6 +174,10 @@ Battery percentage works through the external fuel gauge. The PM8150B charger dr
 
 ---
 
+### GNOME Settings About Page
+- [ ] **Processor name**: arm64 `/proc/cpuinfo` has no `model name`, so the field is blank. It should read "Qualcomm Snapdragon 855 (SM8150)". Needs a libgtop or gnome-control-center fallback, or a local kernel patch that adds `model name` for `qcom,sm8150`.
+- [ ] **Graphics name**: Mesa freedreno reports the GL renderer as `FD640`. It should read "Qualcomm Adreno 640". Needs a Mesa renderer-name change or a gnome-control-center `info_cleanup` rule.
+
 ### Buttons
 - [ ] **Volume keys**
   - Volume up/down do not work yet.
