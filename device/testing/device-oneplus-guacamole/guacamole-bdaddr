@@ -28,7 +28,14 @@ if [ ! -s "$state" ]; then
 	echo "$head$last" | sed -E 's/(..)/\1:/g; s/:$//' > "$state"
 fi
 
-# Only an unconfigured controller accepts a new public address.
-if btmgmt --index 0 config | grep -q 'missing options:.*public-address'; then
-	exec btmgmt --index 0 public-addr "$(cat "$state")"
-fi
+# Only an unconfigured controller accepts a new public address. udev starts
+# this as soon as hci0 appears, before the QCA firmware download finishes and
+# the controller reports the missing address, so wait for that (up to 20 s).
+i=0
+while [ $i -lt 40 ]; do
+	if btmgmt --index 0 config 2>/dev/null | grep -q 'missing options:.*public-address'; then
+		exec btmgmt --index 0 public-addr "$(cat "$state")"
+	fi
+	sleep 0.5
+	i=$((i + 1))
+done
