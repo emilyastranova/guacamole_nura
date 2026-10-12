@@ -77,7 +77,25 @@ The modem DSP hosts the WLAN firmware, and while Wi-Fi is active the MSA memory 
 > [!NOTE]
 > The WCN3990 Wi-Fi firmware (`wlanmdsp.mbn`, `WLAN.HL.3.0.c8`), its board data (`board-2.bin`) and the Bluetooth firmware (`crbtfw21.tlv`, `crnv21.bin`) are currently extracted from a LineageOS 24 OTA with `scripts/extract_lineage_firmware.py`. The extraction step creates a local, gitignored tarball that `firmware-oneplus-guacamole` builds from, so the package cannot yet be built from public URLs alone. The modem itself still uses the OxygenOS 11 build.
 
-The public firmware in [sm8150-mainline/firmware-oneplus-sm8150](https://gitlab.com/sm8150-mainline/firmware-oneplus-sm8150) (`WLAN.HL.3.2.0`) failed station `vdev start` in earlier testing. That testing ran before the UFS HS-G3 cap, while the HS-G4 link was silently dropping writes, so the firmware files or rootfs may have been corrupted. Those results need to be repeated before ruling the GitLab firmware out. That repository carries no Bluetooth firmware; `linux-firmware` ships `qca/crbtfw21.tlv` and `qca/crnv21.bin` and is the public candidate for Bluetooth.
+The public firmware in [sm8150-mainline/firmware-oneplus-sm8150](https://gitlab.com/sm8150-mainline/firmware-oneplus-sm8150) (`WLAN.HL.3.2.0`) does not work. Re-tested on 2026-10-12 with UFS writes verified, both with only its `wlanmdsp.mbn` and with its full modem, `wlanmdsp.mbn` and `board-2.bin` set: the firmware loads and scans, but every connection attempt fails with `vdev-start-response reports status error: -1` on 2.4 GHz and 5 GHz. The earlier failure was therefore not caused by storage corruption. That repository carries no Bluetooth firmware; `linux-firmware` ships `qca/crbtfw21.tlv` and `qca/crnv21.bin`, which have not been tested yet.
+
+### Proprietary Firmware (Decompilation Targets)
+All DSP and radio firmware is closed-source Qualcomm code. These blobs are long-term targets for decompilation and reverse engineering, with the aim of documenting their interfaces and eventually producing open-source replacements:
+
+| Blob | Version | Runs on | Source |
+| :--- | :--- | :--- | :--- |
+| `wlanmdsp.mbn` | `WLAN.HL.3.0.c8` | Modem Hexagon DSP (WLAN process domain) | LineageOS 24 OTA |
+| `board-2.bin` (`bdwlan.bin`) | — | WCN3990 calibration/board data | LineageOS 24 OTA |
+| `crbtfw21.tlv`, `crnv21.bin` | `BTFM.CHE.2.1.5` | WCN3990 Bluetooth core | LineageOS 24 OTA |
+| `modem.mdt` / `modem.bNN` | `MPSS.HE.1.0` (OxygenOS 11) | Modem Hexagon DSP | OxygenOS 11 |
+| `adsp.mdt` / `adsp.bNN` | OxygenOS | Audio DSP | OxygenOS |
+| `a640_zap.mdt` / `a640_zap.bNN` | OxygenOS | GPU secure-mode shader (TrustZone) | OxygenOS |
+| `a640_gmu.bin` | `v2.0.261` | Adreno GPU management unit | `linux-firmware` |
+
+The compute (CDSP) and sensor (SLPI) DSP firmware is not packaged yet; the SLPI image will join this list when sensor work starts.
+
+The Hexagon DSP images are loaded through the TrustZone peripheral authentication service (PAS), which only accepts images signed by Qualcomm/OnePlus on a production device. An open-source rebuild of those images could not be loaded on retail hardware, so for them the realistic goal is documentation of the firmware interfaces (QMI, WMI, FastRPC) rather than a drop-in replacement.
+
 
 ---
 
@@ -136,9 +154,10 @@ guacamole_nura/
   - Secondary microphones, speaker protection and default volume limits.
   - Settle on one sound server (PulseAudio vs PipeWire).
 - [ ] **Wi-Fi, Bluetooth & Modem Bringup** (see "Wi-Fi, Bluetooth & Modem Bringup" in `docs/PLAN.md`):
-  - (WIP) Re-test the sm8150-mainline GitLab Wi-Fi firmware (and the `linux-firmware` Bluetooth files) now that UFS writes are reliable; earlier failures may have come from storage corruption. If they work, drop the LineageOS extraction step.
+  - Test the `linux-firmware` Bluetooth files (`qca/crbtfw21.tlv`, `qca/crnv21.bin`) so Bluetooth no longer depends on the LineageOS OTA.
   - Give `wlan0` a stable MAC address and test WoWLAN.
   - Validate SIM, SMS, mobile data and calls via ModemManager.
+- [ ] **Firmware decompilation** (long term): reverse-engineer the proprietary blobs listed under "Proprietary Firmware (Decompilation Targets)" towards open-source replacements, starting with the WCN3990 Wi-Fi and Bluetooth firmware.
 - [ ] **Auto-rotate** (see "Sensors" in `docs/PLAN.md`).
 - [ ] **Brightness sensor** (see "Sensors" in `docs/PLAN.md`).
 - [ ] **Camera** (see "Camera" in `docs/PLAN.md`).
