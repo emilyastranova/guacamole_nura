@@ -1,0 +1,2 @@
+# Assign a stable public address once the WCN3990 controller registers.
+ACTION=="add", SUBSYSTEM=="bluetooth", KERNEL=="hci0", TAG+="systemd", ENV{SYSTEMD_WANTS}+="guacamole-bdaddr.service"

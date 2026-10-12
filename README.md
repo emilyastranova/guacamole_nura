@@ -41,7 +41,7 @@ This repository contains the bringup workspace, kernel patches, device tree sour
 | **Volume Keys** | :white_check_mark: Working | `gpio-keys` (PM8150 GPIO 6/7) | Volume up/down report `KEY_VOLUMEUP`/`KEY_VOLUMEDOWN` |
 | **GPU Acceleration** | :white_check_mark: Working | Adreno 640 / Mesa Freedreno & Turnip | GMU v2.0.261 + ZAP shader loaded; native OpenGL ES 3.2 and Vulkan 1.3 |
 | **Wi-Fi** | :white_check_mark: Working | `ath10k_snoc` (WCN3990) | 2.4 and 5 GHz, DHCP and internet; OxygenOS 12-era WLAN firmware + kernel patch `0009`. Stable MAC and WoWLAN pending |
-| **Bluetooth** | :x: Not Working | `hci_qca` (WCN3990) | Not yet enabled; see "Wi-Fi, Bluetooth & Modem Bringup" in `docs/PLAN.md` |
+| **Bluetooth** | :white_check_mark: Working | `hci_qca` (WCN3990) on UART13 | Scanning and HID devices; stable address from the factory Wi-Fi MAC; audio profiles untested |
 | **Modem / MPSS** | :construction: DSP running | Hexagon remoteproc / PAS | Modem DSP runs and hosts the WLAN firmware; cellular (ModemManager, SIM, calls, data) not working; see "Wi-Fi, Bluetooth & Modem Bringup" in `docs/PLAN.md` |
 | **Audio** | :white_check_mark: Speakers & Mic | QDSP6 ADSP + 2x NXP TFA9874 (QUAT MI2S) + WCD9340 (SLIMbus) | Stereo speakers and internal mic working via UCM2; earpiece/call audio and speaker protection pending |
 
@@ -119,7 +119,6 @@ guacamole_nura/
   - Settle on one sound server (PulseAudio vs PipeWire).
 - [ ] **Wi-Fi, Bluetooth & Modem Bringup** (see "Wi-Fi, Bluetooth & Modem Bringup" in `docs/PLAN.md`):
   - Give `wlan0` a stable MAC address and test WoWLAN.
-  - Enable WCN3990 Bluetooth (`hci_qca`) and package its firmware.
   - Validate SIM, SMS, mobile data and calls via ModemManager.
 - [ ] **Auto-rotate** (see "Sensors" in `docs/PLAN.md`).
 - [ ] **Camera** (see "Camera" in `docs/PLAN.md`).

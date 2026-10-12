@@ -10,6 +10,7 @@ firmware-oneplus-guacamole package installs:
     qcom/sm8150/oneplus7/modem.mdt, modem.bNN, modemr.jsn, modemuw.jsn,
     wlanmdsp.mbn
     ath10k/WCN3990/hw1.0/board-2.bin   (bdwlan.bin as 'bus=snoc,qmi-board-id=ff')
+    qca/crbtfw21.tlv, qca/crnv21.bin   (WCN3990 Bluetooth, from the bluetooth partition)
 
 Usage:
     scripts/extract_lineage_firmware.py <lineage-*-guacamole-signed.zip> [outdir]
@@ -33,6 +34,8 @@ import tempfile
 import zipfile
 
 MODEM_DIR = "qcom/sm8150/oneplus7"
+BT_DIR = "qca"
+BT_FILES = ("crbtfw21.tlv", "crnv21.bin")
 BOARD_PATH = "ath10k/WCN3990/hw1.0/board-2.bin"
 BOARD_NAME = b"bus=snoc,qmi-board-id=ff"
 
@@ -179,6 +182,15 @@ def main():
         wlan = version_string(os.path.join(src, "wlanmdsp.mbn"), b"WLAN")
         modem = version_string(os.path.join(src, "modem.mdt"), b"MPSS")
 
+        bt_img = os.path.join(tmp, "bluetooth.img")
+        extract_partition(ota, "bluetooth", bt_img)
+        bt_dir = os.path.join(tmp, "bt")
+        os.makedirs(bt_dir)
+        subprocess.run(["mcopy", "-s", "-n", "-i", bt_img, "::/image", bt_dir], check=True)
+        for name in BT_FILES:
+            files["%s/%s" % (BT_DIR, name)] = open(os.path.join(bt_dir, "image", name), "rb").read()
+        bt = version_string(os.path.join(bt_dir, "image", "crbtfw21.tlv"), b"BTFM")
+
     os.makedirs(outdir, exist_ok=True)
     base = "firmware-oneplus-guacamole-%s" % build
     tar_path = os.path.join(outdir, base + ".tar.gz")
@@ -193,10 +205,10 @@ def main():
                     ti.uname = ti.gname = "root"
                     tar.addfile(ti, io.BytesIO(data))
     with open(os.path.join(outdir, base + ".VERSIONS"), "w") as v:
-        v.write("source=%s\nwlan=%s\nmodem=%s\nfiles=%d\n"
-                % (os.path.basename(ota), wlan, modem, len(files)))
+        v.write("source=%s\nwlan=%s\nmodem=%s\nbluetooth=%s\nfiles=%d\n"
+                % (os.path.basename(ota), wlan, modem, bt, len(files)))
     print(tar_path)
-    print("wlan  %s\nmodem %s\nfiles %d" % (wlan, modem, len(files)))
+    print("wlan  %s\nmodem %s\nbt    %s\nfiles %d" % (wlan, modem, bt, len(files)))
 
 
 if __name__ == "__main__":

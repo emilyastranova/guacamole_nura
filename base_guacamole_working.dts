@@ -10,6 +10,11 @@
 	chosen {
 	};
 
+	aliases {
+		/* qcom_geni_serial needs an alias for its line number ("Invalid line -19" without it) */
+		serial1 = "/soc@0/geniqup@cc0000/serial@c8c000";
+	};
+
 	clocks {
 
 		xo-board {
@@ -1689,7 +1694,19 @@
 				pinctrl-names = "default";
 				pinctrl-0 = <0x5a>;
 				interrupts = <0x00 0x249 0x04>;
-				status = "disabled";
+				status = "okay";
+
+				/* WCN3990 Bluetooth (same rails as sm8150-google-flame and OnePlus 7T Pro) */
+				bluetooth {
+					compatible = "qcom,wcn3990-bt";
+					vddio-supply = <&vreg_l1a_0p75>;
+					vddxo-supply = <&vreg_l7a_1p8>;
+					vddrf-supply = <&vreg_l2c_1p3>;
+					vddch0-supply = <&vreg_l11c_3p3>;
+					max-speed = <3200000>;
+					/* ROM version 0x1001 would derive rev 01 names; the board runs rev 21 */
+					firmware-name = "crnv21.bin", "crbtfw21.tlv";
+				};
 			};
 
 			i2c@c90000 {

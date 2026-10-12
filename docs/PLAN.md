@@ -138,7 +138,7 @@ flowchart TD
 ---
 
 ### Wi-Fi, Bluetooth & Modem Bringup
-Wi-Fi connects on 2.4 GHz and 5 GHz. Bluetooth and cellular are not working yet.
+Wi-Fi connects on 2.4 GHz and 5 GHz and Bluetooth works. Cellular is not working yet.
 
 - [x] **Modem / MPSS remoteproc**
   - `remoteproc0` (modem) reaches `running` with `qcom/sm8150/oneplus7/modem.mdt` from `firmware-oneplus-guacamole`; `rmtfs` and `tqftpserv` are active, and the in-kernel pd-mapper replaces the userspace one.
@@ -149,13 +149,15 @@ Wi-Fi connects on 2.4 GHz and 5 GHz. Bluetooth and cellular are not working yet.
   - The OxygenOS 12 modem image spans 160 MiB (`0x8dc00000-0x97c00000`) and fails with "segment outside memory range" against the 150 MiB `mpss_mem`, so the package keeps the OxygenOS 11 modem.
   - Kernel patch `0009`: skip the WMI quiet-mode command on WCN3990 (HL3.2 firmware crashed on it), backported from the linux-wireless series "ath10k: WCN3990 firmware workarounds for WLAN.HL.3.2". Its forced-passive-5 GHz half is not included.
   - Do not test by unbinding/rebinding `ath10k_snoc` or restarting a running modem: the MSA region stays assigned to the modem (`qcom_scm` assign `-22`), and rebooting from that state has put the phone into Qualcomm crashdump mode.
-  - Still to do: stable MAC address (`ath10k` picks a random one each boot), WoWLAN sleep/wake, throughput; `rmtfs` sometimes starts before `remoteproc0` registers (`failed to update start state: Invalid argument`) and the modem then needs a manual `echo start`.
-- [ ] **Crashdump on reboot**: `reboot bootloader` sometimes drops the phone into Qualcomm crashdump mode (2026-10-11, at least twice; recover with Power + Volume Up). Both times the modem was running with Wi-Fi active, so the MSA region was assigned to the modem VM, and once the modem had been started by hand after a failed authentication. Suspect the remoteproc/ath10k shutdown path: mainline does not reclaim MSA permissions before the modem stops. Leads: the OnePlus 7T Pro carries two "ath10k MSA reclaim" patches (`hotdog-linux-bringup/docs/upstream-submissions.md`). To isolate, compare reboots with Wi-Fi off, with the modem stopped first (`echo stop > /sys/class/remoteproc/remoteproc0/state`), and with ramoops/pstore captured afterwards (`scripts/ramoops.sh`).
+  - Still to do: stable MAC address (`ath10k` picks a random one each boot; the factory MAC is `Intf0MacAddress` in `persist/wlan_mac.bin`), WoWLAN sleep/wake, throughput; `rmtfs` sometimes starts before `remoteproc0` registers (`failed to update start state: Invalid argument`) and the modem then needs a manual `echo start`.
+- [ ] **Crashdump on reboot**: `reboot bootloader` sometimes drops the phone into Qualcomm crashdump mode (2026-10-11, at least twice; recover with Power + Volume Up). Both times the modem was running with Wi-Fi active (two later reboots with the Wi-Fi radio switched off first went straight to fastboot), so the MSA region was assigned to the modem VM, and once the modem had been started by hand after a failed authentication. Suspect the remoteproc/ath10k shutdown path: mainline does not reclaim MSA permissions before the modem stops. Leads: the OnePlus 7T Pro carries two "ath10k MSA reclaim" patches (`hotdog-linux-bringup/docs/upstream-submissions.md`). To isolate, compare reboots with Wi-Fi off, with the modem stopped first (`echo stop > /sys/class/remoteproc/remoteproc0/state`), and with ramoops/pstore captured afterwards (`scripts/ramoops.sh`).
 - [ ] **Move to the OxygenOS 12 modem**: rework reserved memory so `mpss_mem` covers 160 MiB (moves `venus_mem` and the following regions; see the NetHunter Pro guacamole patch 0008).
-- [ ] **WCN3990 Bluetooth (`hci_qca`)**
-  - Enable the `qcom,wcn3990-bt` node on its QUP UART with the correct WCN3990 regulators.
-  - Package and load the Bluetooth firmware (`crbtfw*.tlv`, `crnv*.bin`).
-  - Verify `hci0` registration, scanning, and pairing with `bluetoothctl`.
+- [x] **WCN3990 Bluetooth (`hci_qca`)**, scanning and a Bluetooth mouse verified 2026-10-12
+  - UART13 (`serial@c8c000`, GPIO 43–46) with a `qcom,wcn3990-bt` child: `vddio` L1A, `vddxo` L7A, `vddrf` L2C, `vddch0` L11C, 3.2 Mbaud (same as `sm8150-google-flame` and the OnePlus 7T Pro).
+  - `qcom_geni_serial` needs a `serial1` alias in `/aliases`; without it the UART fails with "Invalid line -19".
+  - ROM version `0x1001` would derive rev-01 firmware names, so the node sets `firmware-name = "crnv21.bin", "crbtfw21.tlv"`. Both files come from the LineageOS `bluetooth` partition (`BTFM.CHE.2.1.5`) via `scripts/extract_lineage_firmware.py`, packaged in `firmware-oneplus-guacamole` r4.
+  - The controller has no programmed address and ABL passes no `local-bd-address`, so the kernel registers it as unconfigured and BlueZ ignores it ("no adapter" in GNOME Settings). `device-oneplus-guacamole` r4 adds `guacamole-bdaddr` (udev rule and oneshot service). On first run it derives a stable address from the factory Wi-Fi MAC in `persist/wlan_mac.bin` (last byte + 1), caches it in `/var/lib/guacamole/bdaddr`, and applies it with `btmgmt public-addr` while the controller is unconfigured. The stock `persist/bluetooth` directory is empty, so the real address lives in modem NV.
+  - Still to check: the service on a fresh boot, audio profiles (A2DP/HFP need the audio routing work), and Bluetooth/Wi-Fi coexistence under load.
 - [ ] **Cellular data & calls**
   - Verify QMI/QRTR modem exposure and ModemManager detection.
   - Test SIM detection, SMS, mobile data, and voice calls (voice audio depends on the audio subsystem work).

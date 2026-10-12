@@ -1,0 +1,7 @@
+[Unit]
+Description=Set the OnePlus 7 Pro Bluetooth address
+After=bluetooth.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/guacamole-bdaddr
