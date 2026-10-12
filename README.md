@@ -77,7 +77,7 @@ The modem DSP hosts the WLAN firmware, and while Wi-Fi is active the MSA memory 
 > [!NOTE]
 > The WCN3990 Wi-Fi firmware (`wlanmdsp.mbn`, `WLAN.HL.3.0.c8`), its board data (`board-2.bin`) and the Bluetooth firmware (`crbtfw21.tlv`, `crnv21.bin`) are currently extracted from a LineageOS 24 OTA with `scripts/extract_lineage_firmware.py`. The extraction step creates a local, gitignored tarball that `firmware-oneplus-guacamole` builds from, so the package cannot yet be built from public URLs alone. The modem itself still uses the OxygenOS 11 build.
 
-The public firmware in [sm8150-mainline/firmware-oneplus-sm8150](https://gitlab.com/sm8150-mainline/firmware-oneplus-sm8150) (`WLAN.HL.3.2.0`) does not work. Re-tested on 2026-10-12 with UFS writes verified, both with only its `wlanmdsp.mbn` and with its full modem, `wlanmdsp.mbn` and `board-2.bin` set: the firmware loads and scans, but every connection attempt fails with `vdev-start-response reports status error: -1` on 2.4 GHz and 5 GHz. The earlier failure was therefore not caused by storage corruption. That repository carries no Bluetooth firmware; `linux-firmware` ships `qca/crbtfw21.tlv` and `qca/crnv21.bin`, which have not been tested yet.
+The public firmware in [sm8150-mainline/firmware-oneplus-sm8150](https://gitlab.com/sm8150-mainline/firmware-oneplus-sm8150) (`WLAN.HL.3.2.0`) does not work. Re-tested on 2026-10-12 with UFS writes verified, both with only its `wlanmdsp.mbn` and with its full modem, `wlanmdsp.mbn` and `board-2.bin` set: the firmware loads and scans, but every connection attempt fails with `vdev-start-response reports status error: -1` on 2.4 GHz and 5 GHz. The earlier failure was therefore not caused by storage corruption. That repository carries no Bluetooth firmware. The `linux-firmware` Bluetooth files (`qca/crbtfw21.tlv` `BTFM.CHE.2.1.3`, generic Qualcomm `qca/crnv21.bin`) also work (tested 2026-10-12: controller setup, scanning and a paired HID mouse). The package keeps the newer LineageOS files (`BTFM.CHE.2.1.5`, OnePlus NV data) because the Wi-Fi firmware needs the LineageOS extraction step anyway.
 
 ### Proprietary Firmware (Decompilation Targets)
 All DSP and radio firmware is closed-source Qualcomm code. These blobs are long-term targets for decompilation and reverse engineering, with the aim of documenting their interfaces and eventually producing open-source replacements:
@@ -154,7 +154,6 @@ guacamole_nura/
   - Secondary microphones, speaker protection and default volume limits.
   - Settle on one sound server (PulseAudio vs PipeWire).
 - [ ] **Wi-Fi, Bluetooth & Modem Bringup** (see "Wi-Fi, Bluetooth & Modem Bringup" in `docs/PLAN.md`):
-  - Test the `linux-firmware` Bluetooth files (`qca/crbtfw21.tlv`, `qca/crnv21.bin`) so Bluetooth no longer depends on the LineageOS OTA.
   - Give `wlan0` a stable MAC address and test WoWLAN.
   - Validate SIM, SMS, mobile data and calls via ModemManager.
 - [ ] **Firmware decompilation** (long term): reverse-engineer the proprietary blobs listed under "Proprietary Firmware (Decompilation Targets)" towards open-source replacements, starting with the WCN3990 Wi-Fi and Bluetooth firmware.
