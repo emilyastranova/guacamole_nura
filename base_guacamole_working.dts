@@ -1284,14 +1284,26 @@
 				reg = <0x00 0xa80000 0x00 0x4000>;
 				clock-names = "se";
 				clocks = <0x2c 0x61>;
-				dmas = <0x3e 0x00 0x00 0x03 0x3e 0x01 0x00 0x03>;
-				dma-names = "tx", "rx";
+				/* No GPI DMA: QUP1 GPI controller is disabled; FIFO mode at 100 kHz as on hotdog. */
 				pinctrl-names = "default";
 				pinctrl-0 = <0x3f>;
 				interrupts = <0x00 0x161 0x04>;
 				#address-cells = <0x01>;
 				#size-cells = <0x00>;
-				status = "disabled";
+				clock-frequency = <100000>;
+				status = "okay";
+
+				/*
+				 * Battery fuel gauge. Stock calls it bq27541, but its registers
+				 * follow the bq27421/bq27411 layout (verified on the OnePlus 7T
+				 * Pro). No monitored-battery: never write the factory-programmed
+				 * gauge data memory. The Warp fast-charge MCU at 0x26 on this bus
+				 * is intentionally not described.
+				 */
+				fuel-gauge@55 {
+					compatible = "ti,bq27411";
+					reg = <0x55>;
+				};
 			};
 
 			spi@a80000 {

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-A bringup workspace for running postmarketOS / Nura on the OnePlus 7 Pro (`oneplus-guacamole`, Qualcomm SM8150 / Snapdragon 855). There is no application code and no test suite. "Testing" means building a `boot.img`, booting it on the phone, and checking `dmesg` or the hardware over SSH (`ssh user@172.16.42.1`, USB gadget networking). `docs/PLAN.md` tracks phase status; audio works for stereo speakers and the internal mic (earpiece/call audio still pending). Wi-Fi, Bluetooth, the modem and battery/charging are **not working** yet, even though their firmware, init scripts and the `guacamole-chgctrl` daemon are packaged.
+A bringup workspace for running postmarketOS / Nura on the OnePlus 7 Pro (`oneplus-guacamole`, Qualcomm SM8150 / Snapdragon 855). There is no application code and no test suite. "Testing" means building a `boot.img`, booting it on the phone, and checking `dmesg` or the hardware over SSH (`ssh user@172.16.42.1`, USB gadget networking). `docs/PLAN.md` tracks phase status; audio works for stereo speakers and the internal mic (earpiece/call audio still pending). Battery percentage works (fuel gauge). Wi-Fi, Bluetooth, the modem and the charger driver are **not working** yet, even though their firmware and init scripts are packaged.
 
 ## Boot image pipeline (actual dev loop)
 
@@ -51,6 +51,8 @@ Needs on the host: `dtc`, `mkbootimg`, `avbtool`, `fastboot`/`adb` (or `pmbootst
 
 ## Device-specific gotchas
 
+- Do not enable the PM8150B charger (`charger@1000`) until `qcom_smbx.c` has the SMB5 limit fix (hotdog patch `0020`). Without it, the driver programs about 4.85 V float voltage.
+- The fuel gauge is `ti,bq27411` on `i2c@a80000`. Never add `monitored-battery` to it, because that lets the driver write the gauge's data memory.
 - ABL splices the UFS `dtbo_<slot>` partition into whatever DTB it boots. The active slot's DTBO has been zeroed (the originals are in `backups/`). If boots hang silently with no early output, check this first.
 - Linux rootfs is on `/dev/sda13` (slot `_a`). Stock Android remains on slot `_b`.
 - UFS uses 4096-byte sectors (`deviceinfo_rootfs_image_sector_size`).

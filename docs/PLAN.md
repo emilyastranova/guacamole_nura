@@ -33,7 +33,8 @@ flowchart TD
     F --> H[Audio Subsystem QDSP6 & Codec - SPEAKERS & MIC WORKING]
     H --> I[Wi-Fi, Bluetooth & Modem - NOT WORKING]
     I --> J[Battery & Charging - NOT WORKING]
-    J --> K[Upstreaming & Maintenance - PLANNED]
+    J --> L[Volume Keys - NOT WORKING]
+    L --> K[Upstreaming & Maintenance - PLANNED]
 ```
 
 ---
@@ -153,19 +154,30 @@ Firmware and userspace pieces are packaged, but none of these subsystems are wor
 ---
 
 ### Battery & Charging
-Battery percentage reads 0% even while plugged in. Known DTS gaps in `base_guacamole_working.dts`:
-there is no fuel gauge node (stock DTB has `bq27541-battery@55`), and the PM8150B `charger@1000` node is `status = "disabled"`.
+Battery percentage works through the external fuel gauge. The PM8150B charger driver is not enabled yet; the hardware charges on its bootloader defaults. With a full battery after a day on a PC USB port it holds about 4.34 V float with a +100 mA top-off current, so the actual charge rate from a low battery is still unmeasured.
 
-- [ ] **Fuel gauge**
-  - Add the external fuel gauge at I2C address `0x55` (bus and pins per `extracted_dtb/device.dts`).
-  - Check the register layout: on the OnePlus 7T Pro (`hotdog-linux-bringup` patch 0054) the "bq27541" part actually matches the `ti,bq27411` / bq27421 map. Reading it as bq27541 gives wrong capacity.
-  - Verify `/sys/class/power_supply/*/capacity`, `voltage_now`, `current_now` and `temp` report sane values.
+- [x] **Fuel gauge** — verified 2026-10-11
+  - `ti,bq27411` at `0x55` on `i2c@a80000` (QUP1 SE8, GPIO 88/89), FIFO mode without GPI DMA, 100 kHz. Stock names it `bq27541`, but the registers follow the bq27411/bq27421 layout (as found on the OnePlus 7T Pro, `hotdog-linux-bringup` patch 0054).
+  - No `monitored-battery` property, and `CONFIG_BATTERY_BQ27XXX_DT_UPDATES_NVM` is off, so the factory-programmed gauge data memory is never written.
+  - Reports capacity, voltage, current, temperature, `charge_full` 2977 mAh vs. 3940 mAh design. UPower/Phosh show the percentage.
+  - Still to check: unplugged discharge (negative current, percentage falling in step with `charge_now`). The first readings were taken at 100% after a day on USB.
+  - The OnePlus Warp fast-charge MCU at `0x26` on the same bus is intentionally not described.
 - [ ] **PM8150B charger**
-  - Enable `charger@1000` and confirm the `pm8150b-charger` power supply appears and reports `Charging` when plugged in.
+  - Do not enable `charger@1000` with the current kernel: `qcom_smbx.c` applies SMB2 conversion factors to SMB5 registers, which programs about 4.85 V float voltage and 3.9 A instead of the requested limits.
+  - Port `hotdog-linux-bringup` patch `0020-power-supply-qcom-smbx-use-generation-specific-limits.patch` (applies cleanly to this tree), and review the follow-ups `0150`–`0155` (AICL, SDP current, input current limit).
+  - Add a `simple-battery` node with conservative limits (7T Pro uses 1.5 A, 4.40 V float), enable only the charger (keep `fuel-gauge@...` in the PM8150B disabled to avoid a second battery device), then read back the float-voltage and current registers before leaving it plugged in.
   - Check the USB Type-C / VBUS detection path (`qcom,pm8150b-typec`).
 - [ ] **Charging control daemon**
-  - Update `guacamole-chgctrl.daemon` paths (`bq27541-0`, `pm8150b-charger`) to match the actual power-supply names.
-  - Verify the 40–80% charge limit behaviour and that UPower / Phosh show the correct percentage.
+  - `guacamole-chgctrl.daemon` reads `/sys/class/power_supply/bq27541-0/capacity`; the device is now `bq27411-0`.
+  - It writes `0`/`2` to `pm8150b-charger/status`, which is read-only on mainline. Rework it against the charger driver's actual controls (e.g. `charge_behaviour` or input current limit) once the charger is enabled.
+
+---
+
+### Buttons
+- [ ] **Volume keys**
+  - Volume up/down do not work yet.
+  - Reference: `hotdog-linux-bringup` patch `0018-arm64-dts-hotdog-enable-volume-keys.patch` (OnePlus 7T Pro); confirm the key GPIOs against `extracted_dtb/device.dts`.
+  - Verify key events with `evtest` and volume changes in Phosh.
 
 ---
 
