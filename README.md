@@ -33,14 +33,14 @@ This repository contains the bringup workspace, kernel patches, device tree sour
 | **Bootloader (ABL)** | :white_check_mark: Working | Qualcomm ABL | Unlocked ABL; active slot `dtbo` zeroed to prevent downstream overlay corruption |
 | **Display (DRM/KMS)** | :white_check_mark: Working | `panel-samsung-oneplus-dsc` + MSM DPU/DSI | Native 3120x1440 @ 90Hz Command-Mode DSC with 2 slices/packet |
 | **Touchscreen** | :white_check_mark: Working | `samsung,s6sy761` on `&i2c17` (`0x48`) | Powered via PM8150 `ldo17` (3.0V) + GPIO 119 1.8V rail pull-up |
-| **Storage (UFS)** | :white_check_mark: Working | `ufshcd-qcom` | Dual-lane UFS 3.0 mounted at `/dev/sda`; rootfs installed on `/dev/sda13` |
+| **Storage (UFS)** | :white_check_mark: Working | `ufshcd-qcom` | Capped at HS-G3 (kernel patch `0010`): HS-G4 link errors silently dropped writes; rootfs is a pmOS image on `userdata` |
 | **USB Peripheral** | :white_check_mark: Working | `dwc3-qcom` / USB gadget | USB Type-C OTG + CDC NCM / RNDIS gadget for SSH (`user@172.16.42.1`) |
 | **Battery & Charging** | :construction: Partial | `bq27411` fuel gauge @ `0x55` + PM8150B charger | Percentage, voltage, current and temperature work; charger driver not enabled yet (needs SMB5 limit fix); see "Battery & Charging" in `docs/PLAN.md` |
 | **Volume Keys** | :x: Not Working | PMIC / GPIO keys | Not yet enabled; see "Buttons" in `docs/PLAN.md` |
 | **GPU Acceleration** | :white_check_mark: Working | Adreno 640 / Mesa Freedreno & Turnip | GMU v2.0.261 + ZAP shader loaded; native OpenGL ES 3.2 and Vulkan 1.3 |
-| **Wi-Fi** | :x: Not Working | `ath10k_snoc` (WCN3990) | Board data & WoWLAN rules packaged; see "Wi-Fi, Bluetooth & Modem Bringup" in `docs/PLAN.md` |
+| **Wi-Fi** | :white_check_mark: Working | `ath10k_snoc` (WCN3990) | 2.4 and 5 GHz, DHCP and internet; OxygenOS 12-era WLAN firmware + kernel patch `0009`. Stable MAC and WoWLAN pending |
 | **Bluetooth** | :x: Not Working | `hci_qca` (WCN3990) | Not yet enabled; see "Wi-Fi, Bluetooth & Modem Bringup" in `docs/PLAN.md` |
-| **Modem / MPSS** | :x: Not Working | Hexagon remoteproc / PAS | Firmware & `guacamole-mpss.initd` packaged; see "Wi-Fi, Bluetooth & Modem Bringup" in `docs/PLAN.md` |
+| **Modem / MPSS** | :construction: DSP running | Hexagon remoteproc / PAS | Modem DSP runs and hosts the WLAN firmware; cellular (ModemManager, SIM, calls, data) not working; see "Wi-Fi, Bluetooth & Modem Bringup" in `docs/PLAN.md` |
 | **Audio** | :white_check_mark: Speakers & Mic | QDSP6 ADSP + 2x NXP TFA9874 (QUAT MI2S) + WCD9340 (SLIMbus) | Stereo speakers and internal mic working via UCM2; earpiece/call audio and speaker protection pending |
 
 ---
@@ -116,8 +116,7 @@ guacamole_nura/
   - Secondary microphones, speaker protection and default volume limits.
   - Settle on one sound server (PulseAudio vs PipeWire).
 - [ ] **Wi-Fi, Bluetooth & Modem Bringup** (see "Wi-Fi, Bluetooth & Modem Bringup" in `docs/PLAN.md`):
-  - Bring up the MPSS modem remoteproc with `rmtfs`, `pd-mapper` and `tqftpserv`.
-  - Get WCN3990 Wi-Fi (`ath10k_snoc`) probing and associating.
+  - Give `wlan0` a stable MAC address and test WoWLAN.
   - Enable WCN3990 Bluetooth (`hci_qca`) and package its firmware.
   - Validate SIM, SMS, mobile data and calls via ModemManager.
 - [ ] **Volume keys** (see "Buttons" in `docs/PLAN.md`).

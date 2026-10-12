@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-A bringup workspace for running postmarketOS / Nura on the OnePlus 7 Pro (`oneplus-guacamole`, Qualcomm SM8150 / Snapdragon 855). There is no application code and no test suite. "Testing" means building a `boot.img`, booting it on the phone, and checking `dmesg` or the hardware over SSH (`ssh user@172.16.42.1`, USB gadget networking). `docs/PLAN.md` tracks phase status; audio works for stereo speakers and the internal mic (earpiece/call audio still pending). Battery percentage works (fuel gauge). Wi-Fi, Bluetooth, the modem and the charger driver are **not working** yet, even though their firmware and init scripts are packaged.
+A bringup workspace for running postmarketOS / Nura on the OnePlus 7 Pro (`oneplus-guacamole`, Qualcomm SM8150 / Snapdragon 855). There is no application code and no test suite. "Testing" means building a `boot.img`, booting it on the phone, and checking `dmesg` or the hardware over SSH (`ssh user@172.16.42.1`, USB gadget networking). `docs/PLAN.md` tracks phase status; audio works for stereo speakers and the internal mic (earpiece/call audio still pending). Battery percentage works (fuel gauge) and Wi-Fi connects. Bluetooth, cellular and the charger driver are **not working** yet, even though their firmware and init scripts are packaged.
 
 ## Boot image pipeline (actual dev loop)
 
@@ -53,6 +53,12 @@ Needs on the host: `dtc`, `mkbootimg`, `avbtool`, `fastboot`/`adb` (or `pmbootst
 
 - Do not enable the PM8150B charger (`charger@1000`) until `qcom_smbx.c` has the SMB5 limit fix (hotdog patch `0020`). Without it, the driver programs about 4.85 V float voltage.
 - The fuel gauge is `ti,bq27411` on `i2c@a80000`. Never add `monitored-battery` to it, because that lets the driver write the gauge's data memory.
+- Never test Wi-Fi by unbinding/rebinding `ath10k_snoc` or by stopping/starting `remoteproc0` at runtime: the MSA region stays assigned to the modem, and a reboot from that state has dropped the phone into Qualcomm crashdump mode (recover with Power + Volume Up). Use a fresh boot for every Wi-Fi test.
+- Debug ath10k on a fresh boot by adding `ath10k_core.debug_mask=0x300022` (BOOT, WMI, SNOC, QMI) to the boot image cmdline.
+- UFS must stay at HS-G3 (kernel patch `0010`). At HS-G4 the link drops buffered writes silently (`OCS invalid` after UIC errors). After any suspected corruption, verify with `apk audit --system` and re-hash files after `echo 3 > /proc/sys/vm/drop_caches`.
+- The WLAN firmware and board data come from a LineageOS OTA. Before building `firmware-oneplus-guacamole`, run `scripts/extract_lineage_firmware.py ref/lineageos/<lineage zip> device/testing/firmware-oneplus-guacamole` to create the local tarball.
+- Run `sync` on the phone after every `apk add` and before any reboot (`ssh user@172.16.42.1 'sync; sudo sh -c "sync; reboot bootloader"'`). An r10 kernel upgrade followed straight by `reboot bootloader` once left `/usr/lib/modules/<ver>/` pointing at freed inodes. No modules loaded on the next boot, so touch, audio, the DSPs and Wi-Fi were all missing.
+- Rootfs repair: boot an image with `pmos.debug-shell` on the cmdline, then `nc 172.16.42.1 23`. In that shell, `losetup --show -Pf --direct-io=on --sector-size 4096 /dev/sda19` (`userdata`), `e2fsck -fy /dev/loopNp2`, `losetup -d`, `pmos_continue_boot`. Then restore any cleared package files: extract the APK over `/`, run `depmod -a`, check with `apk audit --system`, and run `udevadm trigger --action=add`.
 - ABL splices the UFS `dtbo_<slot>` partition into whatever DTB it boots. The active slot's DTBO has been zeroed (the originals are in `backups/`). If boots hang silently with no early output, check this first.
 - The Linux rootfs is a pmOS image on the `userdata` partition (UFS LUN 0, partition 19), with the boot and root subpartitions mounted through `loop0` and referenced by UUID in `/etc/fstab`. Stock Android stays on slot `_b`. `sdX` names are not stable: the six UFS LUNs probe asynchronously, so LUN 0 is not always `sda`. Use `/dev/disk/by-partlabel/` or SCSI addresses (`0:0:0:N`) instead.
 - UFS uses 4096-byte sectors (`deviceinfo_rootfs_image_sector_size`).

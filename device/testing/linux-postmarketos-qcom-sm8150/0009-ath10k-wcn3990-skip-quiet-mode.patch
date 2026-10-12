@@ -1,0 +1,37 @@
+Subject: [PATCH] ath10k: skip quiet mode for WCN3990 to prevent firmware crash
+
+Backport of patch 1/2 of the linux-wireless series "ath10k: WCN3990
+firmware workarounds for WLAN.HL.3.2" by Malte Schababerle (March 2026,
+under review, not yet merged), tested upstream on a OnePlus 7T (SM8150).
+
+WLAN.HL.3.2 advertises THERM_THROT, but the firmware crashes (modem
+wlan_process fatal error) when the quiet-mode WMI command is sent during
+startup. On the OnePlus 7 Pro this showed as a crash right after
+"wmi tlv quiet param", before "vdev create". Skip quiet mode for WCN3990.
+
+Patch 2/2 (force passive scan on 5 GHz) is not included: marking 5 GHz
+channels passive in the channel list made the firmware reject station
+vdev start on 5 GHz ("vdev-start-response reports status error").
+
+---
+diff --git a/drivers/net/wireless/ath/ath10k/thermal.c b/drivers/net/wireless/ath/ath10k/thermal.c
+index 8b15ec07b..33f299f41 100644
+--- a/drivers/net/wireless/ath/ath10k/thermal.c
++++ b/drivers/net/wireless/ath/ath10k/thermal.c
+@@ -136,6 +136,16 @@ void ath10k_thermal_set_throttling(struct ath10k *ar)
+ 	if (!ar->wmi.ops->gen_pdev_set_quiet_mode)
+ 		return;
+ 
++	/* WCN3990 firmware crashes on quiet mode despite advertising support.
++	 * See also commit 53884577fbcef ("ath10k: skip sending quiet mode
++	 * cmd for WCN3990").
++	 */
++	if (QCA_REV_WCN3990(ar)) {
++		ath10k_dbg(ar, ATH10K_DBG_BOOT,
++			   "skip quiet mode for WCN3990 (known crash trigger)\n");
++		return;
++	}
++
+ 	if (ar->state != ATH10K_STATE_ON)
+ 		return;
+ 

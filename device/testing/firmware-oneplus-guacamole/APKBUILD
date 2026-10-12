@@ -1,7 +1,7 @@
 pkgname=firmware-oneplus-guacamole
 pkgdesc="OnePlus 7 Pro firmware (WiFi, modem, GPU zap shader)"
 pkgver=1
-pkgrel=0
+pkgrel=3
 url="https://github.com/M1DNYT3/firmware-oneplus-guacamole"
 license="proprietary"
 arch="aarch64"
@@ -11,44 +11,49 @@ _commit="f071a51faf6f6250c35662e8091deb2cb484a025"
 _raw="https://raw.githubusercontent.com/M1DNYT3/firmware-oneplus-guacamole/$_commit"
 
 _gpu="a640_zap.mdt a640_zap.b00 a640_zap.b01 a640_zap.b02"
-_wlan="board.bin board-2.bin"
-_pd="wlanmdsp.mbn modemuw.jsn"
+_pd="modemuw.jsn"
+# OxygenOS 11 modem: fits the 150 MiB mpss_mem region (0x8dc00000-0x97200000).
+# The OxygenOS 12 modem spans 160 MiB and fails with "segment outside memory
+# range" until the reserved-memory map is reworked.
 _modem="modem.mdt modem.b00 modem.b01 modem.b02 modem.b03 modem.b04 modem.b05
 	modem.b06 modem.b07 modem.b08 modem.b09 modem.b10 modem.b11 modem.b12
 	modem.b13 modem.b14 modem.b15 modem.b17 modem.b18 modem.b19 modem.b20
 	modem.b21 modem.b23 modem.b24 modem.b25 modem.b26 modem.b27 modem.b28
 	modem.b29 modem.b30 modem.b31"
 
-source="30-gpu-firmware.files"
+# WLAN firmware (wlanmdsp.mbn) and WCN3990 board data from the OxygenOS 12-era set
+# in a LineageOS OTA. The OxygenOS 10/11 WLAN firmware (WLAN.HL.3.2.0) rejects
+# station vdev start under mainline ath10k. This tarball is not downloadable:
+# generate it next to this APKBUILD with
+#   scripts/extract_lineage_firmware.py <lineage-*-guacamole-signed.zip> \
+#       device/testing/firmware-oneplus-guacamole
+_losfw="firmware-oneplus-guacamole-24.0-20261011"
+
+# Generic WCN3990 host firmware descriptor (features/WMI/HTT IEs), from linux-firmware.
+_linuxfw_tag="20260810"
+source="30-gpu-firmware.files
+	$_losfw.tar.gz
+	firmware-5.bin::https://gitlab.com/kernel-firmware/linux-firmware/-/raw/$_linuxfw_tag/ath10k/WCN3990/hw1.0/firmware-5.bin"
 for _f in $_gpu; do
 	source="$source $_f::$_raw/qcom/$_f"
-done
-for _f in $_wlan; do
-	source="$source $_f::$_raw/ath10k/WCN3990/hw1.0/$_f"
 done
 for _f in $_pd $_modem; do
 	source="$source $_f::$_raw/qcom/sm8150/oneplus7/$_f"
 done
 
 package() {
-	local f
+	local f fw="$srcdir/$_losfw"
 
 	# GPU zap shader (split ELF format for qcom_mdt_loader)
 	for f in $_gpu; do
 		install -Dm644 "$srcdir/$f" "$pkgdir/lib/firmware/qcom/$f"
 	done
 
-	# WCN3990 WiFi board data
-	for f in $_wlan; do
-		install -Dm644 "$srcdir/$f" \
-			"$pkgdir/lib/firmware/ath10k/WCN3990/hw1.0/$f"
-	done
-
-	# pd-mapper files: WLAN protection domain descriptor and DSP firmware
-	for f in $_pd; do
-		install -Dm644 "$srcdir/$f" \
-			"$pkgdir/lib/firmware/postmarketos/qcom/sm8150/oneplus7/$f"
-	done
+	# WCN3990 WiFi host firmware descriptor and board data
+	install -Dm644 "$srcdir/firmware-5.bin" \
+		"$pkgdir/lib/firmware/ath10k/WCN3990/hw1.0/firmware-5.bin"
+	install -Dm644 "$fw/ath10k/WCN3990/hw1.0/board-2.bin" \
+		"$pkgdir/lib/firmware/ath10k/WCN3990/hw1.0/board-2.bin"
 
 	# MPSS modem firmware (required for WCN3990 WiFi via QRTR/WLFW)
 	for f in $_modem; do
@@ -56,21 +61,27 @@ package() {
 			"$pkgdir/lib/firmware/qcom/sm8150/oneplus7/$f"
 	done
 
+	# Served to the modem by tqftpserv: WLAN firmware and protection domain descriptor
+	install -Dm644 "$fw/qcom/sm8150/oneplus7/wlanmdsp.mbn" \
+		"$pkgdir/lib/firmware/postmarketos/qcom/sm8150/oneplus7/wlanmdsp.mbn"
+	for f in $_pd; do
+		install -Dm644 "$srcdir/$f" \
+			"$pkgdir/lib/firmware/postmarketos/qcom/sm8150/oneplus7/$f"
+	done
+
 	# mkinitfs file list so GPU firmware is available before rootfs mounts
 	install -Dm644 "$srcdir/30-gpu-firmware.files" \
 		"$pkgdir/usr/share/mkinitfs/files/30-gpu-firmware.files"
 }
 
-
 sha512sums="
 df0d8e88765556dc82781fed96d7e8ae91edab89cf43ba492b392a2e6679713c99952f2ea2f236f9279e476730f2b3b0361bcae53ed16ae0d3d856d682853b8e  30-gpu-firmware.files
+bcdac9900d1de5c0751c18a08607340c2259d66850968034543f789de829b1a7b6f4b56bc297070fbcf0c91d21a779c4c3ae62508875312778163bd089d03bc6  firmware-oneplus-guacamole-24.0-20261011.tar.gz
+7dce040ac3e1452be43dea64ba2cf7b2b3703371d233c28e9ed768b55fa012dd78104208fcb5e4eccf17cece289d9a09bc0f92227766b40eb99fc5921caa547c  firmware-5.bin
 95f70f93df6b6f9f56b0bf3f5b4699f3dc676f1132d5fd47f6f0cdb9435634ef8a2f54deea47c1823edcdd1d5fc5d8ab185eb959b1becc27bbdf86803b06148d  a640_zap.mdt
 65481da7c71a90a0f083cd74e58166a398396b95ae166722026dab9973ae68c94c17698ab5ac56241d5fa9d091ec3a79fef1d477e1f44e388bea968937b1dbc7  a640_zap.b00
 3a39dca65483f884f06a80fb3cb899096e0feb9beba3ee3bf511bd7a54740d6b374b36e46db66e61a83e6861776207e1b240691581f212739c06c19c5ce05351  a640_zap.b01
 d0a1565cd5ebd776155c67e43ba993489ab6052ca48076f6a29bb0e1e22a9e3cf8685f361ce6ee4095661c1da8d6bb3dcad91932ec4e92db56f8ff05e4b94d8b  a640_zap.b02
-229f012e8c6aaa7e8f29b6f669a4a4a04520d6b3d910c07ef445028ebd8713d72a4d1412f91a9e31c237d74786855ac38908c7cbd304605c04b9fe7fb42f0e95  board.bin
-fe51a4d09dc9a0597f9ede1f24d659e515dc4b83d8cfa693f49e6b1828927db9d33eb443b2533ac1cb1aaeb213b6b23e94b883ab8726bdcc10ce556f26f8d129  board-2.bin
-db99cef2a67452113d580bd409a2b9612e0570c944a70bc2ce96128f39fb38290357e29ec8560df12af84294768f7ec8091a629653624add26f2b05ad6b29fa3  wlanmdsp.mbn
 ad8aa1ce27b4a10f2b522d7f7277edc5ec40dd20da7aefc3ac00ea44f449e90adeede5e7fd02be189cb51315b3ce268e930bac9efee8dfbcb56246c7bf65c6ad  modemuw.jsn
 46485b9e5e2db1e92d726ff9053ebc9a2e85e4da3846f999ecbc933caf49729fdc88a9cd0f7c701181aca971361cf916997fbd541936d04f61f7ca98c1b19eab  modem.mdt
 b0d906c675e982c7121705ef6c05c77ea6dcdd6f8ff34773c7745af8ff0e0ca6544c4590a6c8662585afc30a11283184b383e473d732928058fd92b2baaeb3d1  modem.b00

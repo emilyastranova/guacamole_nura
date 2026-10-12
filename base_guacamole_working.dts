@@ -708,6 +708,18 @@
 		#size-cells = <0x02>;
 		ranges;
 
+		/*
+		 * Bootloader splash framebuffer / display ramdump (stock
+		 * cont_splash_region + disp_rdump_region). Without this, Linux hands
+		 * the pages out and buffered writes intermittently come back as
+		 * zeros (UFS "OCS invalid" completions), as on the OnePlus 7T Pro
+		 * before its reserved-memory map matched stock.
+		 */
+		memory@9c000000 {
+			reg = <0x00 0x9c000000 0x00 0x2400000>;
+			no-map;
+		};
+
 		memory@85700000 {
 			reg = <0x00 0x85700000 0x00 0x600000>;
 			no-map;

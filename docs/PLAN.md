@@ -73,6 +73,9 @@ flowchart TD
 ### UFS Storage, Rootfs & USB Gadget Networking
 - [x] UFS 3.0 detection verified via `ufshcd-qcom` (`/dev/sda` through `/dev/sdf`).
 - [x] Rootfs deployed on `/dev/sda13` (`system_a`, inactive slot `_a`), preserving stock Android on slot `_b`. It was later reinstalled on `userdata` (LUN 0, partition 19) to use the full storage.
+- [x] UFS write integrity at HS-G3 (kernel patch `0010`) — verified 2026-10-11
+  - At HS-G4 the link took repeated data-link TCx replay (`saved_uic_err 0x4`) and PA (`0x40`) errors; each recovery completed in-flight commands with `OCS invalid` and buffered writes were lost (96 KiB runs read back as zeros). This corrupted downloads, the module index, `/etc/apk/world` and firmware files.
+  - Verified with 4 × 1 GiB patterned buffered writes after `drop_caches`: HS-G4 232 bad blocks / 20 UFS error recoveries / 191 `OCS invalid`; HS-G3 0 / 0 / 0. O_DIRECT writes were always intact; RAM held a 5 GiB pattern cleanly; the reserved-memory map matches the stock union.
 - [ ] Stable disk naming: LUN 0 is not always `sda` because the LUNs probe asynchronously, and GNOME Settings then reports the first LUN's size (for example 8.4 MB). Test `scsi_mod.scan=sync`.
 - [x] Configured USB Ethernet gadget networking (`cdc_ncm` / `rndis`).
 - [x] Direct SSH access operational at `ssh user@172.16.42.1`.
@@ -133,17 +136,19 @@ flowchart TD
 ---
 
 ### Wi-Fi, Bluetooth & Modem Bringup
-Firmware and userspace pieces are packaged, but none of these subsystems are working yet.
+Wi-Fi connects on 2.4 GHz and 5 GHz. Bluetooth and cellular are not working yet.
 
-- [ ] **Modem / MPSS remoteproc**
-  - Bring up the Hexagon MPSS PAS remoteproc with `modem.mdt` / `modem.b*` from `firmware-oneplus-guacamole`.
-  - Confirm `rmtfs` is serving the `rmtfs-mem` region and `pd-mapper` / `tqftpserv` are running.
-  - Verify the `guacamole-mpss.initd` service and that the remoteproc reaches `running` without crashing.
-- [ ] **WCN3990 Wi-Fi (`ath10k_snoc`)**
-  - Depends on the modem step above: the WLAN firmware (`wlanmdsp.mbn`) runs on the modem DSP.
-  - Verify `ath10k_snoc` probe, `board-2.bin` / `board.bin` calibration loading, and `wlan0` creation.
-  - Scan and associate via NetworkManager.
-  - Verify WoWLAN sleep/wake (`90-wifi-wowlan.conf`, `90-ath10k-wowlan.rules`, `10-wifi-wowlan`).
+- [x] **Modem / MPSS remoteproc**
+  - `remoteproc0` (modem) reaches `running` with `qcom/sm8150/oneplus7/modem.mdt` from `firmware-oneplus-guacamole`; `rmtfs` and `tqftpserv` are active, and the in-kernel pd-mapper replaces the userspace one.
+  - The packaged modem/WLAN firmware (`WLAN.HL.3.2.0.c2-00011`) is a different OxygenOS build than the phone's own `modem_b` (`c2-00006`); both behave the same for Wi-Fi.
+- [x] **WCN3990 Wi-Fi (`ath10k_snoc`)** — connects on 2.4 and 5 GHz, verified 2026-10-11
+  - Supplies from the stock `qcom,icnss` node: L1A (cx-mx), L7A (1.8 V xo), L2C (1.3 V rfa), L11C (3.3 V ch0). No separate ch1 rail; stock uses L10C for audio.
+  - Firmware: the OxygenOS 10/11 WLAN firmware (`WLAN.HL.3.2.0`) rejects station vdev start under mainline ath10k. `firmware-oneplus-guacamole` now ships the OxygenOS 12-era `wlanmdsp.mbn` (`WLAN.HL.3.0.c8-00232`) and board data from a LineageOS OTA (`scripts/extract_lineage_firmware.py`, local tarball next to the APKBUILD), plus `firmware-5.bin` from linux-firmware `20260810`.
+  - The OxygenOS 12 modem image spans 160 MiB (`0x8dc00000-0x97c00000`) and fails with "segment outside memory range" against the 150 MiB `mpss_mem`, so the package keeps the OxygenOS 11 modem.
+  - Kernel patch `0009`: skip the WMI quiet-mode command on WCN3990 (HL3.2 firmware crashed on it), backported from the linux-wireless series "ath10k: WCN3990 firmware workarounds for WLAN.HL.3.2". Its forced-passive-5 GHz half is not included.
+  - Do not test by unbinding/rebinding `ath10k_snoc` or restarting a running modem: the MSA region stays assigned to the modem (`qcom_scm` assign `-22`), and rebooting from that state has put the phone into Qualcomm crashdump mode.
+  - Still to do: stable MAC address (`ath10k` picks a random one each boot), WoWLAN sleep/wake, throughput; `rmtfs` sometimes starts before `remoteproc0` registers (`failed to update start state: Invalid argument`) and the modem then needs a manual `echo start`.
+- [ ] **Move to the OxygenOS 12 modem**: rework reserved memory so `mpss_mem` covers 160 MiB (moves `venus_mem` and the following regions; see the NetHunter Pro guacamole patch 0008).
 - [ ] **WCN3990 Bluetooth (`hci_qca`)**
   - Enable the `qcom,wcn3990-bt` node on its QUP UART with the correct WCN3990 regulators.
   - Package and load the Bluetooth firmware (`crbtfw*.tlv`, `crnv*.bin`).

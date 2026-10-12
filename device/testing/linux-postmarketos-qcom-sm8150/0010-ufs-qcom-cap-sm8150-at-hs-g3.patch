@@ -1,0 +1,32 @@
+Subject: [PATCH] ufs: qcom: cap SM8150 at HS-G3
+
+On the OnePlus 7 Pro the UFS link takes repeated data-link TCx replay
+(saved_uic_err 0x4) and PA generic (0x40) errors at HS-G4. Each error
+recovery reports OCS_INVALID for every in-flight command, and buffered
+writes in those commands are lost (read back as zeros), corrupting files.
+Limit the negotiated gear to HS-G3 on qcom,sm8150-ufshc.
+
+---
+diff --git a/drivers/ufs/host/ufs-qcom.c b/drivers/ufs/host/ufs-qcom.c
+index 9574fdc2b..e7468d429 100644
+--- a/drivers/ufs/host/ufs-qcom.c
++++ b/drivers/ufs/host/ufs-qcom.c
+@@ -1105,6 +1105,18 @@ static void ufs_qcom_set_host_params(struct ufs_hba *hba)
+ 
+ 	/* This driver only supports symmetic gear setting i.e., hs_tx_gear == hs_rx_gear */
+ 	host_params->hs_tx_gear = host_params->hs_rx_gear = ufs_qcom_get_hs_gear(hba);
++
++	/*
++	 * SM8150: the link takes repeated DL TCx-replay / PA errors at HS-G4,
++	 * and the resulting error recovery completes in-flight writes with
++	 * OCS_INVALID, losing data. Cap the negotiated gear at HS-G3.
++	 */
++	if (of_device_is_compatible(hba->dev->of_node, "qcom,sm8150-ufshc") &&
++	    host_params->hs_tx_gear > UFS_HS_G3) {
++		dev_info(hba->dev, "limiting HS gear to G3 (was G%u)\n",
++			 host_params->hs_tx_gear);
++		host_params->hs_tx_gear = host_params->hs_rx_gear = UFS_HS_G3;
++	}
+ }
+ 
+ static void ufs_qcom_set_host_caps(struct ufs_hba *hba)
