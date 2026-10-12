@@ -12,8 +12,12 @@ mkdir -p "${OUTPUT_DIR}"
 
 # 1. Prepare uncompressed kernel
 echo "[1/4] Decompressing kernel Image..."
-if [ -f "${WORKSPACE_DIR}/build/kernel_r6/boot/vmlinuz" ]; then
-    zcat "${WORKSPACE_DIR}/build/kernel_r6/boot/vmlinuz" > /tmp/Image
+# KERNEL_DIR selects an extracted kernel package (default: build/kernel_r6).
+# Its modules must match the ones installed on the phone's rootfs.
+KERNEL_DIR="${KERNEL_DIR:-${WORKSPACE_DIR}/build/kernel_r6}"
+if [ -f "${KERNEL_DIR}/boot/vmlinuz" ]; then
+    echo "Using kernel from ${KERNEL_DIR}"
+    zcat "${KERNEL_DIR}/boot/vmlinuz" > /tmp/Image
 elif [ -f "${CHROOT_ROOTFS}/boot/vmlinuz" ]; then
     zcat "${CHROOT_ROOTFS}/boot/vmlinuz" > /tmp/Image
 elif [ -f "${CHROOT_ROOTFS}/boot/Image" ]; then
@@ -29,7 +33,9 @@ python3 "${WORKSPACE_DIR}/scripts/patch_dtb.py"
 
 # 3. Locate initramfs
 echo "[3/4] Locating initramfs..."
-if [ -f "/tmp/device_initramfs_r4" ]; then
+if [ -n "${INITRAMFS:-}" ]; then
+    echo "Using initramfs override ${INITRAMFS}"
+elif [ -f "/tmp/device_initramfs_r4" ]; then
     INITRAMFS="/tmp/device_initramfs_r4"
 else
     INITRAMFS="${CHROOT_ROOTFS}/boot/initramfs"

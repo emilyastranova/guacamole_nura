@@ -12,12 +12,36 @@ ccache/
 # Downloaded binaries and firmware
 *.tar.gz
 *.tar.xz
+*.zip
 *.bin
 *.img
 *.dtb
 device.dts
 device.dtb
 boot.img
+
+# Device dumps, backups and pulled logs
+backups/
+extracted_dtb/
+logs/
+
+# Manual snapshots of the working DTS (not build inputs)
+base_guacamole_working.dts.*
+
+# Untracked reference material (read-only)
+hotdog-linux-bringup/
+linux-v6.17.0-sm8150/
+qcom/
+ref/
+
+# Local code-index tooling
+.codegraph/
+.vexp/
+.claude/
+
+# Python
+__pycache__/
+*.pyc
 
 # Temporary and editor files
 *.swp

@@ -31,5 +31,3 @@ index 422119fbd..3faf5bdb0 100644
 +    /* Schematic: VREG_L3C_1P2 */
 +    vdda-pll-supply = <&vreg_l3c_1p2>;
 +};
-
-

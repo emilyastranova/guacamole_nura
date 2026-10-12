@@ -4,7 +4,7 @@ maintainer="Casey Connolly <kcxt@postmarketos.org>"
 pkgname=device-oneplus-guacamole
 pkgdesc="OnePlus 7 Pro"
 pkgver=4
-pkgrel=1
+pkgrel=2
 url="https://postmarketos.org"
 license="MIT"
 arch="aarch64"
@@ -13,6 +13,7 @@ depends="
 	firmware-oneplus-guacamole
 	linux-postmarketos-qcom-sm8150
 	mkbootimg
+	alsa-ucm-conf
 	postmarketos-base
 	msm-modem
 	rmtfs
@@ -31,6 +32,8 @@ source="
 	90-wifi-wowlan.conf
 	90-ath10k-wowlan.rules
 	10-wifi-wowlan
+	HiFi.conf
+	guacamole.conf
 "
 
 build() {
@@ -51,6 +54,12 @@ package() {
 	# Deterministically arm wake-on-wlan on the active Wi-Fi profile.
 	install -Dm755 "$srcdir/10-wifi-wowlan" \
 		"$pkgdir/etc/NetworkManager/dispatcher.d/10-wifi-wowlan"
+
+	# ALSA UCM: TFA9874 speakers on QUAT_MI2S_RX, handset mic on SLIMBUS_0_TX.
+	install -Dm644 "$srcdir/HiFi.conf" \
+		"$pkgdir/usr/share/alsa/ucm2/OnePlus/guacamole/HiFi.conf"
+	install -Dm644 "$srcdir/guacamole.conf" \
+		"$pkgdir/usr/share/alsa/ucm2/conf.d/sm8150/OnePlus 7 Pro.conf"
 }
 
 openrc() {
@@ -85,4 +94,6 @@ c32b679c7d9cc8745ab6ca538473fa46dc96122e2b99823fe54aed06701fb921708c4e2f9d115d1d
 7fe009a4b2389ac56e1ff4380dd7ce90b21e0a435ebd72615e9683c6959c35024e7d2d39f62156359f74043b2c2e6f3a4a84a95a7195b6cc9943e718d342c9c3  90-wifi-wowlan.conf
 940aedbb0a39179ecde436980b27762a3690009c60f9878b4ab0f54d81e7e3e35098cabbf664effdf9aafe835ce65228ebcf97766eb45081d9cbc2cdcd320020  90-ath10k-wowlan.rules
 09251783365a3c3128e794baee6e5f5bd7b543fc46c707c558519e81f2efa71d2d2223cca321e243a0887beeab1460577d0081e2d3bdd8d78930a4b4512c5ea2  10-wifi-wowlan
+859501fa18311f1cea9f9c6231046d2eab7d15f031e9970e0ddb5ba8f875d2f135dbdbb62543c0df4304ee552f827efd15fc8299007115e15ca6a8fdaabfed1f  HiFi.conf
+b3dc15594284308d6d413d0b54d7d24246514e747eaf1b39999c417a5340b243ce4e7d3d250cc8134ab7ea02e6261c6d0b43b2bdc693370fb7ba9e2d31247bbc  guacamole.conf
 "

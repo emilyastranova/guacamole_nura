@@ -1,0 +1,84 @@
+Subject: [PATCH] ASoC: qcom: sm8150: add speaker backend, map every SLIMbus link
+
+Based on hotdog-linux-bringup patches 0039-0041 and 0045 by Robin Snyders.
+
+Drive a 3.072 MHz quaternary MI2S bit clock (48 kHz, stereo, 32-bit
+slots, matching OxygenOS S24_LE) with the SoC as clock master for the
+external TFA9874 speaker amplifiers, and release the clock on shutdown.
+
+sm8150_dai_init() used a per-card flag to set up the WCD934x SLIMbus
+channel map only for the first SLIMbus link; later links (e.g. SLIM
+Capture 1) kept an empty channel list and captured silence. Map every
+SLIMbus link and only guard the per-component jack registration.
+
+---
+diff --git a/sound/soc/qcom/sm8150.c b/sound/soc/qcom/sm8150.c
+index 8ad61345b..5ba196e56 100644
+--- a/sound/soc/qcom/sm8150.c
++++ b/sound/soc/qcom/sm8150.c
+@@ -22,6 +22,7 @@
+ #define SLIM_MAX_TX_PORTS 16
+ #define SLIM_MAX_RX_PORTS 13
+ #define WCD934X_DEFAULT_MCLK_RATE	9600000
++#define QUAT_MI2S_BCLK_RATE	3072000
+ 
+ struct sm8150_snd_data {
+ 	struct snd_soc_jack jack;
+@@ -200,6 +201,8 @@ static int sm8150_snd_hw_params(struct snd_pcm_substream *substream,
+ 	int ret = 0;
+ 
+ 	switch (cpu_dai->id) {
++	case QUATERNARY_MI2S_RX:
++		break;
+ 	case QUATERNARY_TDM_RX_0:
+ 	case QUATERNARY_TDM_TX_0:
+ 		ret = sm8150_tdm_snd_hw_params(substream, params);
+@@ -260,8 +263,7 @@ static int sm8150_dai_init(struct snd_soc_pcm_runtime *rtd)
+ 
+ 	switch (cpu_dai->id) {
+ 	case SLIMBUS_0_RX...SLIMBUS_6_TX:
+-		/* setting up wcd multiple times for slim port is redundant */
+-		if (pdata->slim_port_setup || !link->no_pcm)
++		if (!link->no_pcm)
+ 			return 0;
+ 
+ 		for_each_rtd_codec_dais(rtd, i, codec_dai) {
+@@ -277,6 +279,10 @@ static int sm8150_dai_init(struct snd_soc_pcm_runtime *rtd)
+ 					       WCD934X_DEFAULT_MCLK_RATE,
+ 					       SNDRV_PCM_STREAM_PLAYBACK);
+ 
++			/* the jack belongs to the component, not the link */
++			if (pdata->slim_port_setup)
++				continue;
++
+ 			rval = snd_soc_component_set_jack(codec_dai->component,
+ 							  &pdata->jack, NULL);
+ 			if (rval != 0 && rval != -ENOTSUPP) {
+@@ -306,6 +312,13 @@ static int sm8150_snd_startup(struct snd_pcm_substream *substream)
+ 	struct snd_soc_dai *codec_dai = snd_soc_rtd_to_codec(rtd, 0);
+ 
+ 	switch (cpu_dai->id) {
++	case QUATERNARY_MI2S_RX:
++		snd_soc_dai_set_sysclk(cpu_dai,
++			Q6AFE_LPASS_CLK_ID_QUAD_MI2S_IBIT,
++			QUAT_MI2S_BCLK_RATE, SNDRV_PCM_STREAM_PLAYBACK);
++		/* The external speaker amplifiers consume BCLK and frame sync. */
++		snd_soc_dai_set_fmt(cpu_dai, SND_SOC_DAIFMT_BP_FP);
++		break;
+ 	case QUATERNARY_TDM_RX_0:
+ 		codec_dai_fmt |= SND_SOC_DAIFMT_NB_NF | SND_SOC_DAIFMT_DSP_A;
+ 		if (++(data->quat_tdm_clk_count) == 1) {
+@@ -341,8 +354,12 @@ static void sm8150_snd_shutdown(struct snd_pcm_substream *substream)
+ 				0, SNDRV_PCM_STREAM_PLAYBACK);
+ 		}
+ 		break;
+-	case SLIMBUS_0_RX...SLIMBUS_6_TX:
+ 	case QUATERNARY_MI2S_RX:
++		snd_soc_dai_set_sysclk(cpu_dai,
++			Q6AFE_LPASS_CLK_ID_QUAD_MI2S_IBIT,
++			0, SNDRV_PCM_STREAM_PLAYBACK);
++		break;
++	case SLIMBUS_0_RX...SLIMBUS_6_TX:
+ 		break;
+ 	default:
+ 		pr_err("%s: invalid dai id 0x%x\n", __func__, cpu_dai->id);

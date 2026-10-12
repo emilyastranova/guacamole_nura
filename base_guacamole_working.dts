@@ -940,7 +940,7 @@
 			dma-channel-mask = <0xfa>;
 			iommus = <0x2b 0xd6 0x00>;
 			#dma-cells = <0x03>;
-			status = "disabled";
+			status = "okay";
 			phandle = <0x2d>;
 		};
 
@@ -983,7 +983,7 @@
 			#address-cells = <0x02>;
 			#size-cells = <0x02>;
 			ranges;
-			status = "disabled";
+			status = "okay";
 
 			i2c@880000 {
 				compatible = "qcom,geni-i2c";
@@ -1125,7 +1125,21 @@
 				interrupts = <0x00 0x25d 0x04>;
 				#address-cells = <0x01>;
 				#size-cells = <0x00>;
-				status = "disabled";
+				clock-frequency = <100000>;
+				status = "okay";
+
+				/* NXP TFA9874 speaker amplifiers (rev 0x0c74). Top/earpiece = slot 0, bottom = slot 1. */
+				speaker_top: audio-codec@34 {
+					compatible = "nxp,tfa9874";
+					reg = <0x34>;
+					#sound-dai-cells = <0x00>;
+				};
+
+				speaker_bottom: audio-codec@35 {
+					compatible = "nxp,tfa9874";
+					reg = <0x35>;
+					#sound-dai-cells = <0x00>;
+				};
 			};
 
 			spi@890000 {
@@ -2159,6 +2173,14 @@
 			gpio-reserved-ranges = <0x00 0x04 0x7e 0x04>;
 			phandle = <0x4e>;
 
+			wcd_intr_default: wcd-intr-default-state {
+				pins = "gpio123";
+				function = "gpio";
+				drive-strength = <0x02>;
+				bias-pull-down;
+				input-enable;
+			};
+
 			qup-i2c0-default-state {
 				pins = "gpio0", "gpio1";
 				function = "qup0";
@@ -2229,6 +2251,28 @@
 				drive-strength = <0x02>;
 				bias-disable;
 				phandle = <0x36>;
+			};
+
+			quat_mi2s_active: quat-mi2s-active-state {
+				pins = "gpio137", "gpio138";
+				function = "qua_mi2s";
+				drive-strength = <0x08>;
+				bias-disable;
+				output-high;
+			};
+
+			quat_mi2s_sd0_active: quat-mi2s-sd0-active-state {
+				pins = "gpio139";
+				function = "qua_mi2s";
+				drive-strength = <0x08>;
+				bias-disable;
+			};
+
+			quat_mi2s_sd1_active: quat-mi2s-sd1-active-state {
+				pins = "gpio140";
+				function = "qua_mi2s";
+				drive-strength = <0x08>;
+				bias-disable;
 			};
 
 			qup-spi4-default-state {
@@ -4452,7 +4496,7 @@
 			phandle = <0xda>;
 		};
 
-		slim-ngd@171c0000 {
+		slim: slim-ngd@171c0000 {
 			compatible = "qcom,slim-ngd-v2.1.0";
 			reg = <0x00 0x171c0000 0x00 0x2c000>;
 			interrupts = <0x00 0xa3 0x04>;
@@ -4461,7 +4505,80 @@
 			iommus = <0x2b 0x1b46 0x00>;
 			#address-cells = <0x01>;
 			#size-cells = <0x00>;
-			status = "disabled";
+			status = "okay";
+
+			slim@1 {
+				reg = <1>;
+				#address-cells = <2>;
+				#size-cells = <0>;
+
+				wcd9340_ifd: ifd@0,0 {
+					compatible = "slim217,250";
+					reg = <0 0>;
+				};
+
+				wcd9340: codec@1,0 {
+					compatible = "slim217,250";
+					reg = <1 0>;
+					slim-ifc-dev = <&wcd9340_ifd>;
+
+					#sound-dai-cells = <1>;
+
+					interrupts-extended = <0x4e 123 0x01>;
+					interrupt-controller;
+					#interrupt-cells = <1>;
+
+					clock-names = "extclk";
+					clocks = <0x29 0x02>;
+
+					#clock-cells = <0>;
+					clock-frequency = <9600000>;
+					clock-output-names = "mclk";
+
+					pinctrl-0 = <&wcd_intr_default>;
+					pinctrl-names = "default";
+
+					qcom,micbias1-microvolt = <1800000>;
+					qcom,micbias2-microvolt = <1800000>;
+					qcom,micbias3-microvolt = <1800000>;
+					qcom,micbias4-microvolt = <1800000>;
+
+					reset-gpios = <0x4e 143 0x00>;
+					vdd-buck-supply = <0x68>;
+					vdd-buck-sido-supply = <0x68>;
+					vdd-tx-supply = <0x68>;
+					vdd-rx-supply = <0x68>;
+					vdd-io-supply = <0x68>;
+
+					#address-cells = <1>;
+					#size-cells = <1>;
+
+					wcdgpio: gpio-controller@42 {
+						compatible = "qcom,wcd9340-gpio";
+						gpio-controller;
+						#gpio-cells = <2>;
+						reg = <0x42 0x2>;
+					};
+
+					swm: soundwire@c85 {
+						compatible = "qcom,soundwire-v1.3.0";
+						reg = <0xc85 0x40>;
+						interrupts-extended = <&wcd9340 20>;
+
+						qcom,dout-ports = <6>;
+						qcom,din-ports = <2>;
+						qcom,ports-sinterval-low = /bits/ 8  <0x07 0x1f 0x3f 0x7 0x1f 0x3f 0x0f 0x0f>;
+						qcom,ports-offset1 = /bits/ 8 <0x01 0x02 0x0c 0x6 0x12 0x0d 0x07 0x0a>;
+						qcom,ports-offset2 = /bits/ 8 <0x00 0x00 0x1f 0x00 0x00 0x1f 0x00 0x00>;
+
+						#sound-dai-cells = <1>;
+						clocks = <&wcd9340>;
+						clock-names = "iface";
+						#address-cells = <2>;
+						#size-cells = <0>;
+					};
+				};
+			};
 		};
 
 		remoteproc@17300000 {
@@ -4476,7 +4593,8 @@
 			qcom,qmp = <0x71>;
 			qcom,smem-states = <0xdd 0x00>;
 			qcom,smem-state-names = "stop";
-			status = "disabled";
+			firmware-name = "qcom/sm8150/oneplus7/adsp.mdt";
+			status = "okay";
 
 			glink-edge {
 				interrupts = <0x00 0x9c 0x01>;
@@ -4500,14 +4618,20 @@
 						compatible = "qcom,q6afe";
 						reg = <0x04>;
 
-						dais {
+						q6afedai: dais {
 							compatible = "qcom,q6afe-dais";
 							#address-cells = <0x01>;
 							#size-cells = <0x00>;
 							#sound-dai-cells = <0x01>;
+
+							/* QUATERNARY_MI2S_RX -> TFA9874 speakers, data on SD1 */
+							dai@22 {
+								reg = <22>;
+								qcom,sd-lines = <1>;
+							};
 						};
 
-						cc {
+						q6afecc: cc {
 							compatible = "qcom,q6afe-clocks";
 							#clock-cells = <0x02>;
 						};
@@ -4517,12 +4641,36 @@
 						compatible = "qcom,q6asm";
 						reg = <0x07>;
 
-						dais {
+						q6asmdai: dais {
 							compatible = "qcom,q6asm-dais";
 							#address-cells = <0x01>;
 							#size-cells = <0x00>;
 							#sound-dai-cells = <0x01>;
 							iommus = <0x2b 0x1b21 0x00>;
+
+							dai@0 {
+								reg = <0x00>;
+							};
+
+							dai@1 {
+								reg = <0x01>;
+							};
+
+							dai@2 {
+								reg = <0x02>;
+							};
+
+							dai@3 {
+								reg = <0x03>;
+							};
+
+							dai@4 {
+								reg = <0x04>;
+							};
+
+							dai@5 {
+								reg = <0x05>;
+							};
 						};
 					};
 
@@ -4530,7 +4678,7 @@
 						compatible = "qcom,q6adm";
 						reg = <0x08>;
 
-						routing {
+						q6routing: routing {
 							compatible = "qcom,q6adm-routing";
 							#sound-dai-cells = <0x00>;
 						};
@@ -5050,7 +5198,135 @@
 		};
 	};
 
-	sound {
+	sound: sound {
+		compatible = "qcom,sm8150-sndcard";
+		model = "OnePlus 7 Pro";
+		pinctrl-names = "default";
+		pinctrl-0 = <&quat_mi2s_active &quat_mi2s_sd0_active &quat_mi2s_sd1_active>;
+		/* Mic bias wiring from the stock OxygenOS sm8150-tavil-snd-card routing */
+		audio-routing = "RX_BIAS", "MCLK",
+				"AMIC1", "MIC BIAS1",
+				"AMIC2", "MIC BIAS2",
+				"AMIC3", "MIC BIAS4",
+				"AMIC4", "MIC BIAS1",
+				"AMIC5", "MIC BIAS1";
+
+		mm1-dai-link {
+			link-name = "MultiMedia1";
+			cpu {
+				sound-dai = <&q6asmdai 0>;
+			};
+		};
+
+		mm2-dai-link {
+			link-name = "MultiMedia2";
+			cpu {
+				sound-dai = <&q6asmdai 1>;
+			};
+		};
+
+		mm3-dai-link {
+			link-name = "MultiMedia3";
+			cpu {
+				sound-dai = <&q6asmdai 2>;
+			};
+		};
+
+		mm4-dai-link {
+			link-name = "MultiMedia4";
+			cpu {
+				sound-dai = <&q6asmdai 3>;
+			};
+		};
+
+		mm5-dai-link {
+			link-name = "MultiMedia5";
+			cpu {
+				sound-dai = <&q6asmdai 4>;
+			};
+		};
+
+		mm6-dai-link {
+			link-name = "MultiMedia6";
+			cpu {
+				sound-dai = <&q6asmdai 5>;
+			};
+		};
+
+		speaker-dai-link {
+			link-name = "Speaker Playback";
+			cpu {
+				sound-dai = <&q6afedai 22>;
+			};
+
+			platform {
+				sound-dai = <&q6routing>;
+			};
+
+			codec {
+				sound-dai = <&speaker_top>, <&speaker_bottom>;
+			};
+		};
+
+		slim-dai-link {
+			link-name = "SLIM Playback 1";
+			cpu {
+				sound-dai = <&q6afedai 2>;
+			};
+
+			platform {
+				sound-dai = <&q6routing>;
+			};
+
+			codec {
+				sound-dai = <&wcd9340 0>;
+			};
+		};
+
+		slimcap-dai-link {
+			link-name = "SLIM Capture 1";
+			cpu {
+				sound-dai = <&q6afedai 3>;
+			};
+
+			platform {
+				sound-dai = <&q6routing>;
+			};
+
+			codec {
+				sound-dai = <&wcd9340 1>;
+			};
+		};
+
+		slim2-dai-link {
+			link-name = "SLIM Playback 2";
+			cpu {
+				sound-dai = <&q6afedai 4>;
+			};
+
+			platform {
+				sound-dai = <&q6routing>;
+			};
+
+			codec {
+				sound-dai = <&wcd9340 2>;
+			};
+		};
+
+		slimcap2-dai-link {
+			link-name = "SLIM Capture 2";
+			cpu {
+				sound-dai = <&q6afedai 5>;
+			};
+
+			platform {
+				sound-dai = <&q6routing>;
+			};
+
+			codec {
+				sound-dai = <&wcd9340 3>;
+			};
+		};
 	};
 
 	timer {

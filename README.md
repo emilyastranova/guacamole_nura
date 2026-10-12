@@ -4,7 +4,7 @@
 [![Platform: Nura / postmarketOS](https://img.shields.io/badge/Platform-Nura%20(postmarketOS)-brightgreen.svg)](https://wiki.nura.eco)
 [![Architecture: aarch64](https://img.shields.io/badge/Arch-aarch64-orange.svg)](https://wiki.nura.eco/wiki/Category:Aarch64)
 
-This repository contains the bringup workspace, device package definitions, device trees, firmware packages, helper utilities, and documentation for porting **Nura** (formerly [postmarketOS](https://postmarketos.org)) to the **OnePlus 7 Pro** (codename `guacamole`).
+This repository contains the bringup workspace, kernel patches, device tree sources, firmware packages, helper utilities, and documentation for running **postmarketOS / Nura** on the **OnePlus 7 Pro** (codename `guacamole`).
 
 ---
 
@@ -15,14 +15,14 @@ This repository contains the bringup workspace, device package definitions, devi
 | **Model** | OnePlus 7 Pro (`GM1910`, `GM1911`, `GM1913`, `GM1917`, etc.) |
 | **Codename** | `guacamole` (`oneplus-guacamole`) |
 | **Chipset** | Qualcomm Snapdragon 855 (`SM8150`) |
-| **CPU** | 8-core Kryo 485 (1x 2.84 GHz + 3x 2.42 GHz + 4x 1.78 GHz) |
-| **GPU** | Qualcomm Adreno 640 |
-| **Display** | 6.67" Fluid AMOLED, 3120x1440 (19.5:9), 90Hz |
+| **CPU** | 8-core Kryo 485 (1x 2.84 GHz Prime + 3x 2.42 GHz Gold + 4x 1.78 GHz Silver) |
+| **GPU** | Qualcomm Adreno 640 (`qcom,adreno-640.1`) |
+| **Display** | 6.67" Curved Fluid AMOLED, 3120x1440 (19.5:9), 90Hz Command-Mode DSC |
 | **Touchscreen** | Samsung `s6sy761` I2C Touchscreen (`&i2c17` @ `0x48`) |
-| **Storage** | 128 GB / 256 GB UFS 3.0 (4096-byte sector size) |
+| **Storage** | 128 GB / 256 GB UFS 3.0 (`/dev/sda` through `/dev/sdf`) |
 | **RAM** | 6 GB / 8 GB / 12 GB LPDDR4X |
-| **Partition Scheme** | Standard Android A/B slot system (No dynamic "super" partition) |
-| **Flash Method** | Android Fastboot (`fastboot boot` / `fastboot flash`) |
+| **Partition Scheme** | Standard Android A/B slot system (non-super) |
+| **Access Method** | USB Ethernet Gadget (`172.16.42.1`) + Wayland/Phosh GUI |
 
 ---
 
@@ -30,18 +30,37 @@ This repository contains the bringup workspace, device package definitions, devi
 
 | Subsystem | Status | Driver / Implementation | Notes |
 | :--- | :---: | :--- | :--- |
-| **Bootloader** | :white_check_mark: Working | Qualcomm ABL | Unlocked bootloader supports `fastboot boot` |
-| **Display (Splash)** | :white_check_mark: Working | `simple-framebuffer` | Handed off from bootloader `0x9C000000` |
-| **Crash Logging** | :white_check_mark: Working | `pstore` / `ramoops` | Captures kernel panics across warm reboots |
-| **Device Tree** | :white_check_mark: Integrated | `sm8150-oneplus-guacamole.dts` | Mainline DTS by Caleb Connolly |
-| **Touchscreen** | :white_check_mark: Configured | `samsung,s6sy761` | Bound to `&i2c17` at `0x48` in DTS |
-| **Storage (UFS)** | :construction: In Progress | `ufshcd-qcom` | Requires 4096 sector size configuration |
-| **USB Peripheral** | :construction: In Progress | `dwc3-qcom` / `gadget` | USB Type-C OTG and USB Ethernet for SSH |
-| **Charging Control** | :white_check_mark: Integrated | `guacamole-chgctrl.daemon` | Charging management daemon & init service |
-| **GPU Acceleration** | :construction: In Progress | Freedreno / Turnip (`card0`) | ZAP shader packaged in `firmware-oneplus-guacamole` |
-| **Wi-Fi** | :construction: In Progress | `ath10k_snoc` (WCN3990) | Board data & WoWLAN rules integrated |
-| **Modem / MPSS** | :construction: In Progress | Hexagon remoteproc / PAS | `guacamole-mpss.initd` service integrated |
-| **Audio** | :hourglass_flowing_sand: Planned | Hexagon QDSP6 | ALSA / PipeWire via ADSP |
+| **Bootloader (ABL)** | :white_check_mark: Working | Qualcomm ABL | Unlocked ABL; active slot `dtbo` zeroed to prevent downstream overlay corruption |
+| **Display (DRM/KMS)** | :white_check_mark: Working | `panel-samsung-oneplus-dsc` + MSM DPU/DSI | Native 3120x1440 @ 90Hz Command-Mode DSC with 2 slices/packet |
+| **Touchscreen** | :white_check_mark: Working | `samsung,s6sy761` on `&i2c17` (`0x48`) | Powered via PM8150 `ldo17` (3.0V) + GPIO 119 1.8V rail pull-up |
+| **Storage (UFS)** | :white_check_mark: Working | `ufshcd-qcom` | Dual-lane UFS 3.0 mounted at `/dev/sda`; rootfs installed on `/dev/sda13` |
+| **USB Peripheral** | :white_check_mark: Working | `dwc3-qcom` / USB gadget | USB Type-C OTG + CDC NCM / RNDIS gadget for SSH (`user@172.16.42.1`) |
+| **Battery & Charging** | :x: Not Working | Fuel gauge @ `0x55` + PM8150B charger | Reads 0% while plugged in; fuel gauge node missing, charger disabled in DTS (Phase 10) |
+| **GPU Acceleration** | :white_check_mark: Working | Adreno 640 / Mesa Freedreno & Turnip | GMU v2.0.261 + ZAP shader loaded; native OpenGL ES 3.2 and Vulkan 1.3 |
+| **Wi-Fi** | :x: Not Working | `ath10k_snoc` (WCN3990) | Board data & WoWLAN rules packaged; bringup pending (Phase 9) |
+| **Bluetooth** | :x: Not Working | `hci_qca` (WCN3990) | Not yet enabled (Phase 9) |
+| **Modem / MPSS** | :x: Not Working | Hexagon remoteproc / PAS | Firmware & `guacamole-mpss.initd` packaged; bringup pending (Phase 9) |
+| **Steam & Gaming** | :white_check_mark: Working | Native ARM64 Steam + FEX-Emu + Proton | Turnip Vulkan thunking, pressure-vessel container integration |
+| **Audio** | :white_check_mark: Speakers & Mic | QDSP6 ADSP + 2x NXP TFA9874 (QUAT MI2S) + WCD9340 (SLIMbus) | Stereo speakers and internal mic working via UCM2; earpiece/call audio and speaker protection pending |
+
+---
+
+## Key Breakthroughs & Architecture Notes
+
+### 1. The Bootloader DTBO Discovery
+Stock OnePlus ABL automatically reads `/dev/block/by-name/dtbo_[slot]` from internal UFS and dynamically splices vendor Android DTBO fragments into the in-memory device tree passed by fastboot. Because mainline DTB hierarchy differs fundamentally from downstream Android kernels, this corrupted device tree nodes in RAM, producing silent boot freezes. Zeroing the active slot's `dtbo` partition allowed the clean mainline DTB to pass untouched.
+
+### 2. Native Samsung Command-Mode DSC Display Driver
+The OnePlus 7 Pro uses a high-density 1440x3120 90Hz Samsung AMOLED panel requiring **Command Mode (DCS)** and **Display Stream Compression (DSC v1.1)** with **2 slices per packet** (two 720-pixel slices transmitted together). Because Command Mode panels only update their internal Graphic RAM when the host DPU fires DCS write triggers, SimpleFB remains frozen. We integrated the native `panel-samsung-oneplus-dsc` driver and patched MSM DSI host timing calculations, achieving smooth 90Hz hardware-accelerated display rendering.
+
+### 3. Touchscreen Power Rail Routing
+The `s6sy761` digitizer IC on the OnePlus 7 Pro is powered by **PM8150 LDO 17** (`vreg_l17a_3p0`, 3.0V), unlike the OnePlus 7T Pro which uses PM8150L. Additionally, GPIO 119 (`tp-1v8-active`) must be driven HIGH to enable the 1.8V digital rail. Configuring both supplies enables immediate probing at address `0x48` with full multi-touch reporting on `/dev/input/event1`.
+
+### 4. Native ARM64 Steam Client & Gaming Layer
+Rather than emulating the entire x86_64 Steam client under FEX-Emu (which deadlocks on Chromium CEF sandbox thread/zombie waitpid handling), Valve's native ARM64 Linux Steam client runs natively in an Ubuntu 24.04 container (`steam-box`) via Distrobox.
+- **Vulkan Driver**: Host Turnip Vulkan Adreno 640 mapped into containers.
+- **Emulation**: FEX-Emu translates x86_64 game binaries with Vulkan thunking.
+- **Proton**: Proton Experimental runs Windows binaries via Wine with VKD3D-Proton translating DirectX 12 to Vulkan.
 
 ---
 
@@ -49,14 +68,14 @@ This repository contains the bringup workspace, device package definitions, devi
 
 ```
 guacamole_nura/
-├── .gitignore                      # Git ignore rules for build trees and blobs
-├── README.md                       # Project documentation and quickstart
-├── pmbootstrap/                    # Cloned pmbootstrap source repository
+├── README.md                       # Main project documentation and status
+├── base_guacamole_working.dts      # Active working device tree source for OnePlus 7 Pro
+├── pmbootstrap/                    # pmbootstrap source repository
 │
 ├── device/                         # Nura / postmarketOS package recipes
 │   └── testing/
 │       ├── device-oneplus-guacamole/
-│       │   ├── APKBUILD            # Device package definition with OpenRC subpackage
+│       │   ├── APKBUILD            # Device package definition with OpenRC/systemd subpackages
 │       │   ├── deviceinfo          # Bootimg parameters, screen resolution, offsets
 │       │   ├── guacamole-chgctrl.* # Battery charging daemon, init script & conf
 │       │   ├── guacamole-mpss.initd# MPSS modem bringup service
@@ -70,7 +89,7 @@ guacamole_nura/
 │       └── linux-postmarketos-qcom-sm8150/
 │           ├── APKBUILD            # SM8150 mainline kernel package recipe
 │           ├── config-postmarketos-qcom-sm8150.aarch64 # Kernel Kconfig
-│           └── *.patch             # Hardware patches (UFS, LID, LLVM)
+│           └── *.patch             # Hardware patches (DSC panel, UFS, LID, LLVM)
 │
 ├── dts/                            # Upstream device tree sources
 │   ├── sm8150-oneplus-guacamole.dts# Official OnePlus 7 Pro devicetree
@@ -87,89 +106,23 @@ guacamole_nura/
 │   └── ramoops.sh                  # Dumps pstore logs following kernel panic
 │
 └── docs/                           # Detailed technical documentation
-    └── PLAN.md                     # Comprehensive bringup roadmap & status
+    ├── PLAN.md                     # Comprehensive bringup roadmap & status
+    └── BRINGUP_GUIDE.md            # Hardware notes and bringup walkthrough
 ```
 
 ---
 
-## Getting Started
+## Current Roadmap: Next Focus
 
-### 1. Prerequisites
-
-Ensure your host system (Linux) has the necessary utilities:
-- Python 3.10+
-- `fastboot` and `adb` (from `android-tools`)
-- `dtc` (device-tree-compiler)
-- Git and OpenSSL
-
-### 2. Initialize Development Environment
-
-Source the environment script to register aliases and set path variables:
-```bash
-source scripts/envsetup.sh
-```
-
-### 3. Configure `pmbootstrap`
-
-Initialize pmbootstrap for your environment:
-```bash
-pmbootstrap init
-```
-When prompted:
-- **Work path**: `~/.local/var/pmbootstrap`
-- **Channel**: `edge`
-- **Vendor**: `oneplus`
-- **Device**: `guacamole`
-- **Kernel**: `postmarketos-qcom-sm8150`
-- **User Interface**: `phosh` (or `sxmo` / `console`)
-
-Link your local device packages into pmbootstrap's aports tree:
-```bash
-APORTS="$(pmbootstrap -q config aports)"
-ln -s "$(pwd)/device/testing/device-oneplus-guacamole" "$APORTS/device/testing/device-oneplus-guacamole"
-ln -s "$(pwd)/device/testing/firmware-oneplus-guacamole" "$APORTS/device/testing/firmware-oneplus-guacamole"
-ln -s "$(pwd)/device/testing/linux-postmarketos-qcom-sm8150" "$APORTS/device/testing/linux-postmarketos-qcom-sm8150"
-```
-
----
-
-## Development Workflow
-
-### Step 1: Build Packages with `pmbootstrap`
-
-Build the kernel and firmware packages:
-```bash
-pmbootstrap build linux-postmarketos-qcom-sm8150
-pmbootstrap build firmware-oneplus-guacamole
-pmbootstrap build device-oneplus-guacamole
-```
-
-### Step 2: Test Booting (Non-destructive)
-
-To test a newly built kernel without overwriting your phone's storage:
-1. Put the OnePlus 7 Pro into Fastboot mode (`Power` + `Volume Down`).
-2. Run the boot test helper:
-   ```bash
-   ./scripts/flash_boot.sh test
-   ```
-   This executes `fastboot boot boot.img`, streaming the image directly to RAM.
-
-### Step 3: Debugging Panics with Ramoops
-
-If the device hangs or reboots into the bootloader:
-1. Boot into TWRP or an alternative functional recovery kernel.
-2. Run the ramoops helper:
-   ```bash
-   ./scripts/ramoops.sh
-   ```
-3. Inspect `logs/ramoops_*/` for panic traces and stack traces.
-
----
-
-## Key References & Upstream Projects
-
-- [OnePlus 7 Pro Nura Wiki](https://wiki.nura.eco/wiki/OnePlus_7_Pro_(oneplus-guacamole))
-- [SM8150 Mainline Linux Kernel (`sm8150/6.17`)](https://gitlab.postmarketos.org/soc/qualcomm-sm8150/linux)
-- [M1DNYT3 pmaports branch](https://gitlab.postmarketos.org/M1DNYT3/pmaports/-/tree/device-oneplus-guacamole)
-- [Caleb Connolly's Qualcomm Mainline Contributions](https://gitlab.postmarketos.org/soc/qualcomm-sm8150/linux/-/commits/sm8150/6.17)
-- [Full Bringup Plan](file:///home/emily/Documents/Code_Workspace/guacamole_nura/docs/PLAN.md)
+- [ ] **Audio follow-ups** (see `docs/PLAN.md` Step 8.7):
+  - Earpiece "receiver" profile and call audio routing.
+  - Secondary microphones, speaker protection and default volume limits.
+  - Settle on one sound server (PulseAudio vs PipeWire).
+- [ ] **Wi-Fi, Bluetooth & Modem Bringup** (see `docs/PLAN.md` Phase 9):
+  - Bring up the MPSS modem remoteproc with `rmtfs`, `pd-mapper` and `tqftpserv`.
+  - Get WCN3990 Wi-Fi (`ath10k_snoc`) probing and associating.
+  - Enable WCN3990 Bluetooth (`hci_qca`) and package its firmware.
+  - Validate SIM, SMS, mobile data and calls via ModemManager.
+- [ ] **Battery & Charging** (see `docs/PLAN.md` Phase 10):
+  - Add the fuel gauge node at I2C `0x55` (likely `ti,bq27411` register layout, as on the 7T Pro).
+  - Enable the PM8150B charger and fix `guacamole-chgctrl.daemon` power-supply paths.
