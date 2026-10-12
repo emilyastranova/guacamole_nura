@@ -1,6 +1,6 @@
 # OnePlus 7 Pro (`oneplus-guacamole`) Mainline Linux & postmarketOS Bring-up
 
-## 1. Device Hardware Overview
+## Device Hardware Overview
 
 | Subsystem | Specification |
 | :--- | :--- |
@@ -16,36 +16,36 @@
 
 ---
 
-## 2. Bootloader Mechanics & The Critical DTBO Discovery
+## Bootloader DTBO Overlay
 
-### The Failure Symptom
+### Symptom
 Early attempts to boot upstream / mainline kernels (`linux-6.17-sm8150`) stalled before any userspace init or early printk appeared, despite passing valid boot arguments and DTBs inside Android `boot.img`.
 
-### Root Cause: ABL DTBO Overlaying
+### Cause
 The OnePlus ABL (Android Bootloader) uses Qualcomm's dynamic device-tree overlay mechanism:
 1. When booting from slot `_b`, ABL loads the base DTB from the `boot.img` passed by fastboot.
 2. ABL then automatically reads the partition `/dev/block/by-name/dtbo_b` from the internal UFS storage.
 3. It traverses vendor DTBO fragments (specifically Qualcomm BSP Android overlays) and attempts to splice them into the in-memory DTB at runtime.
-4. Because the mainline SM8150 DTB structure differs significantly from Qualcomm's downstream Android 10/11 kernel DTB, ABL corrupted device tree nodes in RAM, producing immediate early boot aborts.
+4. Because the mainline SM8150 DTB structure differs significantly from Qualcomm's downstream Android 10/11 kernel DTB, ABL corrupted device tree nodes in RAM, which aborted the boot before any console output.
 
-### Resolution
+### Fix
 - Zeroed out the active slot's DTBO partition:
   ```bash
   dd if=/dev/zero of=/dev/block/by-name/dtbo_b
   ```
   *(A full raw backup was preserved at `backups/dtbo_b.img` beforehand).*
-- Result: ABL passes the clean mainline DTB untouched. The kernel immediately executed, decompressed EFI stub, initialized all 8 cores, and booted into userspace.
+- Result: ABL passes the mainline DTB through unmodified. The kernel boots through the EFI stub, brings up all 8 CPUs and reaches userspace.
 
 ---
 
-## 3. Storage, Partitioning & Preserving Stock Android
+## Storage, Partitioning & Preserving Stock Android
 
 ### Strategy: Non-Destructive Inactive Slot Usage
 The device operates on an A/B dual-slot scheme:
 - Stock Android resided on slot `_b` (`system_b`, `boot_b`, `vendor_b`, `userdata`).
 - Slot `_a` was inactive. We targeted `/dev/sda13` (`system_a`), leaving slot `_b` intact for stock recovery.
 
-### Storage Layout Discovered
+### Storage Layout
 Mainline Linux exposes the UFS LUNs as standard SCSI disks:
 - `/dev/sda`: Main user data and OS partitions (LUN 0)
 - `/dev/sdb`: Boot partition 1 / xbl_a (LUN 1)
@@ -62,18 +62,18 @@ Mainline Linux exposes the UFS LUNs as standard SCSI disks:
 
 ---
 
-## 4. The Display Challenge: SimpleFB vs. Command-Mode DSC
+## Display: SimpleFB vs. Command-Mode DSC
 
-### Why SimpleFB Failed to Animate
+### Why SimpleFB Does Not Update
 - In stock Android and bootloader mode, ABL paints an initial splash image (or Tux penguins when kernel boots) into reserved RAM at `0x9c000000`.
 - In standard video-mode panels, `simplefb` or `simple-framebuffer` continuously scans out that memory over DSI.
-- **However**, the OnePlus 7 Pro uses a **Samsung Command Mode (CMD) DSC panel** (`samsung_oneplus_dsc_cmd_display`).
+- The OnePlus 7 Pro, however, uses a **Samsung Command Mode (CMD) DSC panel** (`samsung_oneplus_dsc_cmd_display`).
   - Command Mode panels have their own onboard Graphic RAM (GRAM).
   - The display only updates when the host DPU / DSI controller actively fires MIPI DCS write triggers (`MIPI_DSI_DCS_LONG_WRITE`).
   - Once ABL turns over control to the kernel, hardware refreshes cease.
   - Writing to `/dev/fb0` updates host RAM at `0x9c000000`, but without active DPU refresh pulses, the physical panel's GRAM remains unchanged—frozen displaying the boot penguins.
 
-### The Solution: Native DRM / DPU Bring-Up
+### Native DRM/DPU Driver Stack
 To drive this panel, Linux must natively control:
 1. **Qualcomm DPU 5.0.0** (`display-controller@ae01000`)
 2. **Qualcomm DSI Controller 2.3.0** (`dsi@ae94000`)
@@ -82,12 +82,12 @@ To drive this panel, Linux must natively control:
 
 ---
 
-## 5. Native Display Driver Architecture & Implementation
+## Native Display Driver Architecture & Implementation
 
-### A. The Reference Source
-The OnePlus 7T Pro (`hotdog`) community project ([`hotdog-linux-bringup`](file:///home/emily/Documents/Code_Workspace/guacamole_nura/hotdog-linux-bringup)) solved this display stack for SM8150. Both devices share the identical 1440x3120 Samsung AMOLED panel assembly.
+### Reference Source
+The OnePlus 7T Pro (`hotdog`) community project ([`hotdog-linux-bringup`](file:///home/emily/Documents/Code_Workspace/guacamole_nura/hotdog-linux-bringup)) already supports this display stack on SM8150. Both devices use the same 1440x3120 Samsung AMOLED panel.
 
-### B. Kernel Patch Components (`0004-drm-msm-enable-native-guacamole-dsc-panel.patch`)
+### Kernel Patch Components (`0004-drm-msm-enable-native-guacamole-dsc-panel.patch`)
 
 1. **DSI Host Multi-Slice Fix (`drivers/gpu/drm/msm/dsi/dsi_host.c`)**:
    - Upstream MSM DSI assumed `dsc_slice_per_pkt = 1`.
@@ -117,7 +117,7 @@ The OnePlus 7T Pro (`hotdog`) community project ([`hotdog-linux-bringup`](file:/
 
 ---
 
-## 6. Build & Packaging Pipeline
+## Build & Packaging Pipeline
 
 - **Kernel Package**: `linux-postmarketos-qcom-sm8150` in `pmaports/device/testing/linux-postmarketos-qcom-sm8150`
 - **Configuration**:

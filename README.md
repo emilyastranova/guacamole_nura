@@ -35,32 +35,35 @@ This repository contains the bringup workspace, kernel patches, device tree sour
 | **Touchscreen** | :white_check_mark: Working | `samsung,s6sy761` on `&i2c17` (`0x48`) | Powered via PM8150 `ldo17` (3.0V) + GPIO 119 1.8V rail pull-up |
 | **Storage (UFS)** | :white_check_mark: Working | `ufshcd-qcom` | Dual-lane UFS 3.0 mounted at `/dev/sda`; rootfs installed on `/dev/sda13` |
 | **USB Peripheral** | :white_check_mark: Working | `dwc3-qcom` / USB gadget | USB Type-C OTG + CDC NCM / RNDIS gadget for SSH (`user@172.16.42.1`) |
-| **Battery & Charging** | :x: Not Working | Fuel gauge @ `0x55` + PM8150B charger | Reads 0% while plugged in; fuel gauge node missing, charger disabled in DTS (Phase 10) |
+| **Battery & Charging** | :x: Not Working | Fuel gauge @ `0x55` + PM8150B charger | Reads 0% while plugged in; fuel gauge node missing, charger disabled in DTS; see "Battery & Charging" in `docs/PLAN.md` |
 | **GPU Acceleration** | :white_check_mark: Working | Adreno 640 / Mesa Freedreno & Turnip | GMU v2.0.261 + ZAP shader loaded; native OpenGL ES 3.2 and Vulkan 1.3 |
-| **Wi-Fi** | :x: Not Working | `ath10k_snoc` (WCN3990) | Board data & WoWLAN rules packaged; bringup pending (Phase 9) |
-| **Bluetooth** | :x: Not Working | `hci_qca` (WCN3990) | Not yet enabled (Phase 9) |
-| **Modem / MPSS** | :x: Not Working | Hexagon remoteproc / PAS | Firmware & `guacamole-mpss.initd` packaged; bringup pending (Phase 9) |
+| **Wi-Fi** | :x: Not Working | `ath10k_snoc` (WCN3990) | Board data & WoWLAN rules packaged; see "Wi-Fi, Bluetooth & Modem Bringup" in `docs/PLAN.md` |
+| **Bluetooth** | :x: Not Working | `hci_qca` (WCN3990) | Not yet enabled; see "Wi-Fi, Bluetooth & Modem Bringup" in `docs/PLAN.md` |
+| **Modem / MPSS** | :x: Not Working | Hexagon remoteproc / PAS | Firmware & `guacamole-mpss.initd` packaged; see "Wi-Fi, Bluetooth & Modem Bringup" in `docs/PLAN.md` |
 | **Steam & Gaming** | :white_check_mark: Working | Native ARM64 Steam + FEX-Emu + Proton | Turnip Vulkan thunking, pressure-vessel container integration |
 | **Audio** | :white_check_mark: Speakers & Mic | QDSP6 ADSP + 2x NXP TFA9874 (QUAT MI2S) + WCD9340 (SLIMbus) | Stereo speakers and internal mic working via UCM2; earpiece/call audio and speaker protection pending |
 
 ---
 
-## Key Breakthroughs & Architecture Notes
+## Hardware Notes
 
-### 1. The Bootloader DTBO Discovery
-Stock OnePlus ABL automatically reads `/dev/block/by-name/dtbo_[slot]` from internal UFS and dynamically splices vendor Android DTBO fragments into the in-memory device tree passed by fastboot. Because mainline DTB hierarchy differs fundamentally from downstream Android kernels, this corrupted device tree nodes in RAM, producing silent boot freezes. Zeroing the active slot's `dtbo` partition allowed the clean mainline DTB to pass untouched.
+### Bootloader DTBO Overlay
+Stock OnePlus ABL automatically reads `/dev/block/by-name/dtbo_[slot]` from internal UFS and dynamically splices vendor Android DTBO fragments into the in-memory device tree passed by fastboot. The mainline DTB layout differs from the downstream Android kernel's, so the overlay corrupts nodes and the boot hangs with no output. Zeroing the active slot's `dtbo` partition stops ABL from applying the overlay.
 
-### 2. Native Samsung Command-Mode DSC Display Driver
-The OnePlus 7 Pro uses a high-density 1440x3120 90Hz Samsung AMOLED panel requiring **Command Mode (DCS)** and **Display Stream Compression (DSC v1.1)** with **2 slices per packet** (two 720-pixel slices transmitted together). Because Command Mode panels only update their internal Graphic RAM when the host DPU fires DCS write triggers, SimpleFB remains frozen. We integrated the native `panel-samsung-oneplus-dsc` driver and patched MSM DSI host timing calculations, achieving smooth 90Hz hardware-accelerated display rendering.
+### Native Samsung Command-Mode DSC Display Driver
+The OnePlus 7 Pro uses a high-density 1440x3120 90Hz Samsung AMOLED panel requiring **Command Mode (DCS)** and **Display Stream Compression (DSC v1.1)** with **2 slices per packet** (two 720-pixel slices transmitted together). Because Command Mode panels only update their internal Graphic RAM when the host DPU fires DCS write triggers, SimpleFB remains frozen. The `panel-samsung-oneplus-dsc` driver and a patch to the MSM DSI host timing calculations drive the panel at 90 Hz through the MSM DPU.
 
-### 3. Touchscreen Power Rail Routing
-The `s6sy761` digitizer IC on the OnePlus 7 Pro is powered by **PM8150 LDO 17** (`vreg_l17a_3p0`, 3.0V), unlike the OnePlus 7T Pro which uses PM8150L. Additionally, GPIO 119 (`tp-1v8-active`) must be driven HIGH to enable the 1.8V digital rail. Configuring both supplies enables immediate probing at address `0x48` with full multi-touch reporting on `/dev/input/event1`.
+### Touchscreen Power Rail Routing
+The `s6sy761` digitizer IC on the OnePlus 7 Pro is powered by **PM8150 LDO 17** (`vreg_l17a_3p0`, 3.0V), unlike the OnePlus 7T Pro which uses PM8150L. Additionally, GPIO 119 (`tp-1v8-active`) must be driven HIGH to enable the 1.8V digital rail. With both supplies configured, the controller probes at address `0x48` and reports multi-touch events on `/dev/input/event1`.
 
-### 4. Native ARM64 Steam Client & Gaming Layer
+### Native ARM64 Steam Client & Gaming Layer
 Rather than emulating the entire x86_64 Steam client under FEX-Emu (which deadlocks on Chromium CEF sandbox thread/zombie waitpid handling), Valve's native ARM64 Linux Steam client runs natively in an Ubuntu 24.04 container (`steam-box`) via Distrobox.
 - **Vulkan Driver**: Host Turnip Vulkan Adreno 640 mapped into containers.
 - **Emulation**: FEX-Emu translates x86_64 game binaries with Vulkan thunking.
 - **Proton**: Proton Experimental runs Windows binaries via Wine with VKD3D-Proton translating DirectX 12 to Vulkan.
+
+### Speaker Amplifiers
+The loudspeakers are not driven by the WCD9340 codec. Two NXP TFA9874 amplifiers (I2C `0x34` top/earpiece, `0x35` bottom, on `i2c@890000`) receive audio over `QUATERNARY_MI2S_RX` at S24_LE, 48 kHz. Their register profile matches the stock `/vendor/firmware/tfa98xx.cnt`. The WCD9340 on SLIMbus handles the microphones.
 
 ---
 
@@ -106,7 +109,7 @@ guacamole_nura/
 │   └── ramoops.sh                  # Dumps pstore logs following kernel panic
 │
 └── docs/                           # Detailed technical documentation
-    ├── PLAN.md                     # Comprehensive bringup roadmap & status
+    ├── PLAN.md                     # Bringup roadmap and status
     └── BRINGUP_GUIDE.md            # Hardware notes and bringup walkthrough
 ```
 
@@ -114,15 +117,15 @@ guacamole_nura/
 
 ## Current Roadmap: Next Focus
 
-- [ ] **Audio follow-ups** (see `docs/PLAN.md` Step 8.7):
+- [ ] **Audio follow-ups** (see "Remaining audio work" in `docs/PLAN.md`):
   - Earpiece "receiver" profile and call audio routing.
   - Secondary microphones, speaker protection and default volume limits.
   - Settle on one sound server (PulseAudio vs PipeWire).
-- [ ] **Wi-Fi, Bluetooth & Modem Bringup** (see `docs/PLAN.md` Phase 9):
+- [ ] **Wi-Fi, Bluetooth & Modem Bringup** (see "Wi-Fi, Bluetooth & Modem Bringup" in `docs/PLAN.md`):
   - Bring up the MPSS modem remoteproc with `rmtfs`, `pd-mapper` and `tqftpserv`.
   - Get WCN3990 Wi-Fi (`ath10k_snoc`) probing and associating.
   - Enable WCN3990 Bluetooth (`hci_qca`) and package its firmware.
   - Validate SIM, SMS, mobile data and calls via ModemManager.
-- [ ] **Battery & Charging** (see `docs/PLAN.md` Phase 10):
+- [ ] **Battery & Charging** (see "Battery & Charging" in `docs/PLAN.md`):
   - Add the fuel gauge node at I2C `0x55` (likely `ti,bq27411` register layout, as on the 7T Pro).
   - Enable the PM8150B charger and fix `guacamole-chgctrl.daemon` power-supply paths.

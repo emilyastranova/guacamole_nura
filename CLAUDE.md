@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-A bringup workspace for running postmarketOS / Nura on the OnePlus 7 Pro (`oneplus-guacamole`, Qualcomm SM8150 / Snapdragon 855). There is no application code and no test suite. "Testing" means building a `boot.img`, booting it on the phone, and checking `dmesg` or the hardware over SSH (`ssh user@172.16.42.1`, USB gadget networking). `docs/PLAN.md` tracks phase status; audio works for stereo speakers and the internal mic (Phase 8; earpiece/call audio still pending). Wi-Fi, Bluetooth and the modem (Phase 9) and battery/charging (Phase 10) are **not working** yet, even though their firmware, init scripts and the `guacamole-chgctrl` daemon are packaged.
+A bringup workspace for running postmarketOS / Nura on the OnePlus 7 Pro (`oneplus-guacamole`, Qualcomm SM8150 / Snapdragon 855). There is no application code and no test suite. "Testing" means building a `boot.img`, booting it on the phone, and checking `dmesg` or the hardware over SSH (`ssh user@172.16.42.1`, USB gadget networking). `docs/PLAN.md` tracks phase status; audio works for stereo speakers and the internal mic (earpiece/call audio still pending). Wi-Fi, Bluetooth, the modem and battery/charging are **not working** yet, even though their firmware, init scripts and the `guacamole-chgctrl` daemon are packaged.
 
-## The boot image pipeline (the actual dev loop)
+## Boot image pipeline (actual dev loop)
 
 Device-tree work does **not** go through the upstream `dts/*.dts` sources. The loop is:
 
