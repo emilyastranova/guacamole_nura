@@ -40,7 +40,6 @@ This repository contains the bringup workspace, kernel patches, device tree sour
 | **Wi-Fi** | :x: Not Working | `ath10k_snoc` (WCN3990) | Board data & WoWLAN rules packaged; see "Wi-Fi, Bluetooth & Modem Bringup" in `docs/PLAN.md` |
 | **Bluetooth** | :x: Not Working | `hci_qca` (WCN3990) | Not yet enabled; see "Wi-Fi, Bluetooth & Modem Bringup" in `docs/PLAN.md` |
 | **Modem / MPSS** | :x: Not Working | Hexagon remoteproc / PAS | Firmware & `guacamole-mpss.initd` packaged; see "Wi-Fi, Bluetooth & Modem Bringup" in `docs/PLAN.md` |
-| **Steam & Gaming** | :white_check_mark: Working | Native ARM64 Steam + FEX-Emu + Proton | Turnip Vulkan thunking, pressure-vessel container integration |
 | **Audio** | :white_check_mark: Speakers & Mic | QDSP6 ADSP + 2x NXP TFA9874 (QUAT MI2S) + WCD9340 (SLIMbus) | Stereo speakers and internal mic working via UCM2; earpiece/call audio and speaker protection pending |
 
 ---
@@ -55,12 +54,6 @@ The OnePlus 7 Pro uses a high-density 1440x3120 90Hz Samsung AMOLED panel requir
 
 ### Touchscreen Power Rail Routing
 The `s6sy761` digitizer IC on the OnePlus 7 Pro is powered by **PM8150 LDO 17** (`vreg_l17a_3p0`, 3.0V), unlike the OnePlus 7T Pro which uses PM8150L. Additionally, GPIO 119 (`tp-1v8-active`) must be driven HIGH to enable the 1.8V digital rail. With both supplies configured, the controller probes at address `0x48` and reports multi-touch events on `/dev/input/event1`.
-
-### Native ARM64 Steam Client & Gaming Layer
-Rather than emulating the entire x86_64 Steam client under FEX-Emu (which deadlocks on Chromium CEF sandbox thread/zombie waitpid handling), Valve's native ARM64 Linux Steam client runs natively in an Ubuntu 24.04 container (`steam-box`) via Distrobox.
-- **Vulkan Driver**: Host Turnip Vulkan Adreno 640 mapped into containers.
-- **Emulation**: FEX-Emu translates x86_64 game binaries with Vulkan thunking.
-- **Proton**: Proton Experimental runs Windows binaries via Wine with VKD3D-Proton translating DirectX 12 to Vulkan.
 
 ### Speaker Amplifiers
 The loudspeakers are not driven by the WCD9340 codec. Two NXP TFA9874 amplifiers (I2C `0x34` top/earpiece, `0x35` bottom, on `i2c@890000`) receive audio over `QUATERNARY_MI2S_RX` at S24_LE, 48 kHz. Their register profile matches the stock `/vendor/firmware/tfa98xx.cnt`. The WCD9340 on SLIMbus handles the microphones.

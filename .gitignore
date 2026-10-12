@@ -57,3 +57,6 @@ __pycache__/
 modules.order
 Module.symvers
 .config.old
+
+# Personal experiments outside the project scope
+fetch_arm64_steam.py

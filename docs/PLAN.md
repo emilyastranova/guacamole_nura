@@ -30,8 +30,7 @@ flowchart TD
     C --> D[UFS Storage, Rootfs & USB SSH - COMPLETE]
     D --> E[Native Display DRM/KMS DSC & Touchscreen - COMPLETE]
     E --> F[GPU Acceleration & Mobile UI - COMPLETE]
-    F --> G[Steam & Gaming Compatibility Layer - COMPLETE]
-    G --> H[Audio Subsystem QDSP6 & Codec - SPEAKERS & MIC WORKING]
+    F --> H[Audio Subsystem QDSP6 & Codec - SPEAKERS & MIC WORKING]
     H --> I[Wi-Fi, Bluetooth & Modem - NOT WORKING]
     I --> J[Battery & Charging - NOT WORKING]
     J --> K[Upstreaming & Maintenance - PLANNED]
@@ -96,18 +95,6 @@ flowchart TD
   - Secure ZAP shader `a640_zap.mdt` authenticated into `zap-shader` memory.
   - DRM/KMS Freedreno OpenGL ES 3.2 and Mesa Turnip Vulkan 1.3 drivers active.
 - [x] Phosh / Phoc Wayland shell running at 90 Hz.
-
----
-
-### Steam & Gaming Compatibility Layer
-- [x] Deployed native ARM64 Steam Client inside Ubuntu 24.04 container (`steam-box`) via Distrobox.
-- [x] Verified hardware-accelerated Turnip Vulkan driver (`k_EGpuDriverId_MesaTurnip`, 4GB VRAM) mapped inside container.
-- [x] Configured FEX-Emu (`fex-compat-tool`) with Vulkan thunking for x86_64 binaries.
-- [x] Integrated Proton Experimental (Wine 11 / VKD3D-Proton).
-- [x] Runtime fixes:
-  - Disabled deadlocked CUPS daemon connection attempts from Wine's `WINSPOOL.DRV`.
-  - Patched `SteamAPI_RestartAppIfNecessary` restart exits.
-  - Patched `winex11.so` to skip the broken guest Mesa GLX initialization without affecting Vulkan/DirectX 12.
 
 ---
 
