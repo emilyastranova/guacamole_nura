@@ -1,0 +1,32 @@
+Subject: [PATCH] power: supply: bq27xxx: report Full only while supplied
+
+The bq27411-compatible gauge on the OnePlus 7 Pro keeps its full-charge
+flag set after the charger is unplugged until the state of charge drops
+below its clear threshold, so the battery kept reporting Full while
+discharging and UPower treated the phone as on external power.
+
+When the battery has a described supplier (power-supplies) and none of
+them is online, fall through to the current-based status instead of Full.
+Without a described supplier power_supply_am_i_supplied() returns
+-ENODEV and the previous behaviour is kept.
+
+---
+diff --git a/drivers/power/supply/bq27xxx_battery.c b/drivers/power/supply/bq27xxx_battery.c
+index ad2d9ecf3..6321d9b2a 100644
+--- a/drivers/power/supply/bq27xxx_battery.c
++++ b/drivers/power/supply/bq27xxx_battery.c
+@@ -1899,7 +1899,13 @@ static int bq27xxx_battery_current_and_status(
+ 		val_curr->intval = curr;
+ 
+ 	if (val_status) {
+-		if (bq27xxx_battery_is_full(di, flags))
++		/*
++		 * The full-charge flag stays set until the state of charge drops
++		 * below the gauge's clear threshold, also while running from the
++		 * battery. Only report Full while a described supplier is online.
++		 */
++		if (bq27xxx_battery_is_full(di, flags) &&
++		    (!di->bat || power_supply_am_i_supplied(di->bat) != 0))
+ 			val_status->intval = POWER_SUPPLY_STATUS_FULL;
+ 		else if (curr > 0)
+ 			val_status->intval = POWER_SUPPLY_STATUS_CHARGING;

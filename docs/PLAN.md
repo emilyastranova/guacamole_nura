@@ -32,7 +32,7 @@ flowchart TD
     E --> F[GPU Acceleration & Mobile UI - COMPLETE]
     F --> H[Audio Subsystem QDSP6 & Codec - SPEAKERS & MIC WORKING]
     H --> I[Wi-Fi, Bluetooth & Modem - NOT WORKING]
-    I --> J[Battery & Charging - NOT WORKING]
+    I --> J[Battery & Charging - WORKING]
     J --> L[Volume Keys - WORKING]
     L --> M[Auto-rotate / SLPI sensors - NOT WORKING]
     M --> N[Camera - NOT WORKING]
@@ -165,7 +165,7 @@ Wi-Fi connects on 2.4 GHz and 5 GHz and Bluetooth works. Cellular is not working
 ---
 
 ### Battery & Charging
-Battery percentage works through the external fuel gauge. The PM8150B charger driver is not enabled yet; the hardware charges on its bootloader defaults. With a full battery after a day on a PC USB port it holds about 4.34 V float with a +100 mA top-off current, so the actual charge rate from a low battery is still unmeasured.
+Battery percentage, charging and the plugged-in/unplugged state work. The charge-limit daemon still needs rework.
 
 - [x] **Fuel gauge** — verified 2026-10-11
   - `ti,bq27411` at `0x55` on `i2c@a80000` (QUP1 SE8, GPIO 88/89), FIFO mode without GPI DMA, 100 kHz. Stock names it `bq27541`, but the registers follow the bq27411/bq27421 layout (as found on the OnePlus 7T Pro, `hotdog-linux-bringup` patch 0054).
@@ -173,14 +173,15 @@ Battery percentage works through the external fuel gauge. The PM8150B charger dr
   - Reports capacity, voltage, current, temperature, `charge_full` 2977 mAh vs. 3940 mAh design. UPower/Phosh show the percentage.
   - Still to check: unplugged discharge (negative current, percentage falling in step with `charge_now`). The first readings were taken at 100% after a day on USB.
   - The OnePlus Warp fast-charge MCU at `0x26` on the same bus is intentionally not described.
-- [ ] **PM8150B charger**
-  - Do not enable `charger@1000` with the current kernel: `qcom_smbx.c` applies SMB2 conversion factors to SMB5 registers, which programs about 4.85 V float voltage and 3.9 A instead of the requested limits.
-  - Port `hotdog-linux-bringup` patch `0020-power-supply-qcom-smbx-use-generation-specific-limits.patch` (applies cleanly to this tree), and review the follow-ups `0150`–`0155` (AICL, SDP current, input current limit).
-  - Add a `simple-battery` node with conservative limits (7T Pro uses 1.5 A, 4.40 V float), enable only the charger (keep `fuel-gauge@...` in the PM8150B disabled to avoid a second battery device), then read back the float-voltage and current registers before leaving it plugged in.
-  - Check the USB Type-C / VBUS detection path (`qcom,pm8150b-typec`).
+- [x] **PM8150B charger (SMB5)**, verified 2026-10-12
+  - Kernel patch `0011`: `qcom_smbx` used SMB2 conversions on SMB5 hardware (about 4.85 V / 3.9 A on PM8150B). It now uses generation-specific ranges, keeps charging and USB input suspended until the limits are programmed, defines the SMB5 ICL bits and reruns AICL after ICL changes. Backported from `hotdog-linux-bringup` patches 0020, 0155 and 0150; 0151/0152 do not apply to this base.
+  - `simple-battery` node with conservative limits below stock (stock `fv-max-uv` 4.365 V; `OP_4000mAh` profile 4.37 V and 3.0 A): 4.35 V float, 1.5 A fast charge, 310 mA termination, 4000 mAh. `charger@1000` is enabled with `monitored-battery`. The PM8150B fuel gauge stays disabled because the bq27411 is the battery source.
+  - Registers read back through `/sys/kernel/debug/regmap/0-02/registers`: `0x1070` = `0x4b` (4.35 V), `0x1061` = `0x1e` (1.5 A), `0x1370` = `0x0a` (500 mA ICL on a PC SDP port), `0x1006` = fast-charge state.
+  - Kernel patch `0012` with `power-supplies = <&pm8150b_charger>` on the gauge: the bq27411 kept its full-charge flag after unplugging, so it reported `Full` while discharging and UPower/Phosh still showed the charging bolt. It now reports `Full` only while the charger is online.
+  - Still to check: charging from a wall charger (DCP detection and a higher ICL), thermal behaviour while charging, and raising the fast-charge current towards stock once that is validated.
 - [ ] **Charging control daemon**
   - `guacamole-chgctrl.daemon` reads `/sys/class/power_supply/bq27541-0/capacity`; the device is now `bq27411-0`.
-  - It writes `0`/`2` to `pm8150b-charger/status`, which is read-only on mainline. Rework it against the charger driver's actual controls (e.g. `charge_behaviour` or input current limit) once the charger is enabled.
+  - It writes `0`/`2` to `pm8150b-charger/status`, which is read-only on mainline. Rework it against the charger driver's actual controls (e.g. `charge_behaviour` or the input current limit).
 
 ---
 

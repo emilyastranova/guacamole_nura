@@ -1320,6 +1320,8 @@
 				fuel-gauge@55 {
 					compatible = "ti,bq27411";
 					reg = <0x55>;
+					/* Lets the gauge drop "Full" once the charger goes offline (kernel patch 0012) */
+					power-supplies = <&pm8150b_charger>;
 				};
 			};
 
@@ -4309,14 +4311,15 @@
 					phandle = <0x104>;
 				};
 
-				charger@1000 {
+				pm8150b_charger: charger@1000 {
 					compatible = "qcom,pm8150b-charger";
 					reg = <0x1000>;
 					interrupts = <0x02 0x13 0x04 0x03 0x02 0x12 0x02 0x03 0x02 0x16 0x01 0x01 0x02 0x13 0x07 0x01>;
 					interrupt-names = "usb-plugin", "bat-ov", "wdog-bark", "usbin-icl-change";
 					io-channels = <0xd6 0x07 0xd6 0x08>;
 					io-channel-names = "usbin_i", "usbin_v";
-					status = "disabled";
+					monitored-battery = <&battery>;
+					status = "okay";
 				};
 
 				adc@3100 {
@@ -5259,6 +5262,22 @@
 			vdd-3.3-ch0-supply = <&vreg_l11c_3p3>;
 			status = "okay";
 		};
+	};
+
+	/*
+	 * Battery limits for the PM8150B SMB5 charger. Conservative initial
+	 * values, below the stock limits: stock fv-max 4.365 V, OP_4000mAh
+	 * profile 4.37 V max and 3.0 A fast charge, op,sw-iterm 310 mA.
+	 */
+	battery: battery {
+		compatible = "simple-battery";
+		device-chemistry = "lithium-ion-polymer";
+		charge-full-design-microamp-hours = <4000000>;
+		voltage-min-design-microvolt = <3400000>;
+		voltage-max-design-microvolt = <4370000>;
+		constant-charge-current-max-microamp = <1500000>;
+		constant-charge-voltage-max-microvolt = <4350000>;
+		charge-term-current-microamp = <310000>;
 	};
 
 	/* Volume keys on PM8150 GPIO 6/7 (active low), as in the stock gpio_keys node */

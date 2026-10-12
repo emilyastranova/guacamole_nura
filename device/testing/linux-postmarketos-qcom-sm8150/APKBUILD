@@ -3,7 +3,7 @@ maintainer="Pan Ortiz <panjeoc@proton.me>"
 _flavor="postmarketos-qcom-sm8150"
 pkgname=linux-$_flavor
 pkgver=6.17.0
-pkgrel=11
+pkgrel=13
 pkgdesc="Mainline Kernel fork for SM8150 devices"
 arch="aarch64"
 _carch="arm64"
@@ -42,6 +42,8 @@ source="
 	0008-asoc-sm8150-add-quaternary-mi2s-speaker-backend.patch
 	0009-ath10k-wcn3990-skip-quiet-mode.patch
 	0010-ufs-qcom-cap-sm8150-at-hs-g3.patch
+	0011-power-supply-qcom-smbx-smb5-limits-and-aicl.patch
+	0012-power-supply-bq27xxx-report-full-only-while-supplied.patch
 "
 builddir="$srcdir/linux-$_tag"
 
@@ -102,4 +104,6 @@ af3dbf57c8052868f269440bbe9bdc9023cf51f626d7ede12599b41ec5b5c4895dd015bbf5981db4
 7455a40ce9df41e4d78ccede2fb8875222caaa689bf4541c7ee89d248d914328a815ee4d912299c874fef80ac81960fde8e811f6df9a7ffc4bf7106a92a74ac0  0008-asoc-sm8150-add-quaternary-mi2s-speaker-backend.patch
 7bf90e9d88e6aa3f06d10961c8960c338e526b90421432bdda8de27f81ea562c27b4c22a003b50f3c91bef0c60ea3c739ab3b59203c5d7ad2b21f1811fc340d9  0009-ath10k-wcn3990-skip-quiet-mode.patch
 f1544115b86d522f0b8b537436316d87ecfbf2e508d8a1ea6ec851088e4978f50ba04c02bf1ab9182958c2ce31d6ed9b1ab7c24e4f21443bbd6ca0740806c3be  0010-ufs-qcom-cap-sm8150-at-hs-g3.patch
+bf0a3c23a6b316487a79c5637d2437d539c430658d04703d8fb4cd9c54d75f4f24272b0f7dd971eda199f00ed3de6efb513fbc365d8cd911c7374a9d768acf77  0011-power-supply-qcom-smbx-smb5-limits-and-aicl.patch
+acaf8fd0728f14d2540c2f9f8cf0b6563a5df2a31aaf5c2dfa2122348ad6465f1b76fab701507c2c29678ad9024c8f12ac9a2a9c92c5ddbc4a74d42f0fac7cfb  0012-power-supply-bq27xxx-report-full-only-while-supplied.patch
 "
