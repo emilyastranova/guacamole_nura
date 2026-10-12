@@ -35,8 +35,9 @@ This repository contains the bringup workspace, kernel patches, device tree sour
 | **Touchscreen** | :white_check_mark: Working | `samsung,s6sy761` on `&i2c17` (`0x48`) | Powered via PM8150 `ldo17` (3.0V) + GPIO 119 1.8V rail pull-up |
 | **Storage (UFS)** | :white_check_mark: Working | `ufshcd-qcom` | Capped at HS-G3 (kernel patch `0010`): HS-G4 link errors silently dropped writes; rootfs is a pmOS image on `userdata` |
 | **USB Peripheral** | :white_check_mark: Working | `dwc3-qcom` / USB gadget | USB Type-C OTG + CDC NCM / RNDIS gadget for SSH (`user@172.16.42.1`) |
-| **Battery & Charging** | :white_check_mark: Working | `bq27411` gauge + PM8150B SMB5 charger | Percentage, charging and plugged-in state; limits 4.35 V / 1.5 A (kernel patches `0011`, `0012`); charge-limit daemon pending |
+| **Battery & Charging** | :construction: WIP | `bq27411` gauge + PM8150B SMB5 charger | Percentage, charging and plugged-in state work (4.35 V / 1.5 A, kernel patches `0011`, `0012`); charge-limit daemon and wall-charger charging are WIP |
 | **Auto-rotate** | :x: Not Working | SLPI sensor DSP (SSC) | Accelerometer is behind the sensor DSP; see "Sensors" in `docs/PLAN.md` |
+| **Brightness Sensor** | :x: Not Working | SLPI sensor DSP (SSC) | Ambient light sensor is behind the sensor DSP, like the accelerometer; see "Sensors" in `docs/PLAN.md` |
 | **Camera** | :x: Not Working | SM8150 CAMSS / CCI | Not started; see "Camera" in `docs/PLAN.md` |
 | **Volume Keys** | :white_check_mark: Working | `gpio-keys` (PM8150 GPIO 6/7) | Volume up/down report `KEY_VOLUMEUP`/`KEY_VOLUMEDOWN` |
 | **GPU Acceleration** | :white_check_mark: Working | Adreno 640 / Mesa Freedreno & Turnip | GMU v2.0.261 + ZAP shader loaded; native OpenGL ES 3.2 and Vulkan 1.3 |
@@ -121,7 +122,8 @@ guacamole_nura/
   - Give `wlan0` a stable MAC address and test WoWLAN.
   - Validate SIM, SMS, mobile data and calls via ModemManager.
 - [ ] **Auto-rotate** (see "Sensors" in `docs/PLAN.md`).
+- [ ] **Brightness sensor** (see "Sensors" in `docs/PLAN.md`).
 - [ ] **Camera** (see "Camera" in `docs/PLAN.md`).
 - [ ] **Battery & Charging** (see "Battery & Charging" in `docs/PLAN.md`):
-  - Rework `guacamole-chgctrl.daemon` for the `bq27411-0` gauge and mainline charger controls.
-  - Validate wall-charger (DCP) charging and thermals before raising the 1.5 A limit.
+  - (WIP) Rework `guacamole-chgctrl.daemon` for the `bq27411-0` gauge and mainline charger controls.
+  - (WIP) Validate wall-charger (DCP) charging and thermals before raising the 1.5 A limit.

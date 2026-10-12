@@ -34,7 +34,7 @@ flowchart TD
     H --> I[Wi-Fi, Bluetooth & Modem - NOT WORKING]
     I --> J[Battery & Charging - WORKING]
     J --> L[Volume Keys - WORKING]
-    L --> M[Auto-rotate / SLPI sensors - NOT WORKING]
+    L --> M[Auto-rotate & brightness / SLPI sensors - NOT WORKING]
     M --> N[Camera - NOT WORKING]
     N --> K[Upstreaming & Maintenance - PLANNED]
 ```
@@ -193,6 +193,10 @@ Battery percentage, charging and the plugged-in/unplugged state work. The charge
 - [ ] **Auto-rotate (accelerometer)**
   - The stock device tree has no accelerometer on an AP-visible bus; the motion sensors sit behind the SLPI sensor DSP (Qualcomm SSC).
   - Needs the SLPI remoteproc, the sensor firmware/registry, and an SSC client in userspace feeding `iio-sensor-proxy`. Reference: `hotdog-linux-bringup/docs/evidence/*slpi*`, `*sensor*` (OnePlus 7T Pro).
+
+- [ ] **Automatic brightness (ambient light sensor)**
+  - The stock device tree has no ambient light sensor on an AP-visible bus; like the accelerometer it is reached through the SLPI sensor DSP. On the OnePlus 7T Pro it is a TCS3701 (light and proximity); identify the 7 Pro part from the SLPI sensor registry.
+  - Same dependency as auto-rotate: SLPI remoteproc, sensor registry, an SSC client feeding `iio-sensor-proxy`. Reference: `hotdog-linux-bringup/docs/evidence/*alsps*`, `*tcs3701*`, `*als-type*`.
 
 ### Camera
 - [ ] **Cameras**
