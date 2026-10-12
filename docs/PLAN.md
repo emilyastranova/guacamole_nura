@@ -81,6 +81,10 @@ flowchart TD
 - [ ] Stable disk naming: LUN 0 is not always `sda` because the LUNs probe asynchronously, and GNOME Settings then reports the first LUN's size (for example 8.4 MB). Test `scsi_mod.scan=sync`.
 - [x] Configured USB Ethernet gadget networking (`cdc_ncm` / `rndis`).
 - [x] Direct SSH access operational at `ssh user@172.16.42.1`.
+- [ ] **USB host (OTG)**: not working. A USB thumb drive on a USB-C OTG adapter did not show up at all (2026-10-12).
+  - The DWC3 controller (`usb@a600000`) is fixed to `dr_mode = "peripheral"`, so it never switches to host mode.
+  - The PM8150B Type-C port (`typec@1500`) and VBUS regulator (`usb-vbus-regulator@1100`) are disabled, so nothing detects the OTG cable or supplies 5 V to the device.
+  - Likely fix: enable both PM8150B nodes, connect the Type-C port to the DWC3 role switch (`usb-role-switch`, `dr_mode = "otg"`), and confirm the USB gadget (SSH over `172.16.42.1`) still works in device mode. The OnePlus 7T Pro bringup (`hotdog-linux-bringup/`) is a reference.
 
 ---
 
