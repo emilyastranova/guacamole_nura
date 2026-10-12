@@ -35,7 +35,7 @@ This repository contains the bringup workspace, kernel patches, device tree sour
 | **Touchscreen** | :white_check_mark: Working | `samsung,s6sy761` on `&i2c17` (`0x48`) | Powered via PM8150 `ldo17` (3.0V) + GPIO 119 1.8V rail pull-up |
 | **Storage (UFS)** | :white_check_mark: Working | `ufshcd-qcom` | Capped at HS-G3 (kernel patch `0010`): HS-G4 link errors silently dropped writes; rootfs is a pmOS image on `userdata` |
 | **USB Peripheral** | :white_check_mark: Working | `dwc3-qcom` / USB gadget | CDC NCM / RNDIS gadget for SSH (`user@172.16.42.1`) |
-| **USB Host (OTG)** | :x: Not Working | `dwc3-qcom` + PM8150B Type-C / VBUS | A USB thumb drive is not detected. The controller is fixed to `dr_mode = "peripheral"` and the PM8150B Type-C and VBUS regulator nodes are disabled; see "USB host (OTG)" in `docs/PLAN.md` |
+| **USB Host (OTG)** | :white_check_mark: Working | `dwc3-qcom` role switch + PM8150B Type-C / VBUS | Dual-role port managed by `qcom,pmic-typec`; a USB thumb drive enumerates at SuperSpeed and mounts in Files. USB gadget/SSH still works when attached to a PC |
 | **Battery & Charging** | :construction: WIP | `bq27411` gauge + PM8150B SMB5 charger | Percentage, charging and plugged-in state work (4.35 V / 1.5 A, kernel patches `0011`, `0012`); charge-limit daemon and wall-charger charging are WIP |
 | **Auto-rotate** | :x: Not Working | SLPI sensor DSP (SSC) | Accelerometer is behind the sensor DSP; see "Sensors" in `docs/PLAN.md` |
 | **Brightness Sensor** | :x: Not Working | SLPI sensor DSP (SSC) | Ambient light sensor is behind the sensor DSP, like the accelerometer; see "Sensors" in `docs/PLAN.md` |
@@ -139,7 +139,6 @@ guacamole_nura/
   - (WIP) Re-test the sm8150-mainline GitLab Wi-Fi firmware (and the `linux-firmware` Bluetooth files) now that UFS writes are reliable; earlier failures may have come from storage corruption. If they work, drop the LineageOS extraction step.
   - Give `wlan0` a stable MAC address and test WoWLAN.
   - Validate SIM, SMS, mobile data and calls via ModemManager.
-- [ ] **USB host (OTG)** (see "USB host (OTG)" in `docs/PLAN.md`).
 - [ ] **Auto-rotate** (see "Sensors" in `docs/PLAN.md`).
 - [ ] **Brightness sensor** (see "Sensors" in `docs/PLAN.md`).
 - [ ] **Camera** (see "Camera" in `docs/PLAN.md`).

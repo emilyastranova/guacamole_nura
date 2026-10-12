@@ -81,10 +81,11 @@ flowchart TD
 - [ ] Stable disk naming: LUN 0 is not always `sda` because the LUNs probe asynchronously, and GNOME Settings then reports the first LUN's size (for example 8.4 MB). Test `scsi_mod.scan=sync`.
 - [x] Configured USB Ethernet gadget networking (`cdc_ncm` / `rndis`).
 - [x] Direct SSH access operational at `ssh user@172.16.42.1`.
-- [ ] **USB host (OTG)**: not working. A USB thumb drive on a USB-C OTG adapter did not show up at all (2026-10-12).
-  - The DWC3 controller (`usb@a600000`) is fixed to `dr_mode = "peripheral"`, so it never switches to host mode.
-  - The PM8150B Type-C port (`typec@1500`) and VBUS regulator (`usb-vbus-regulator@1100`) are disabled, so nothing detects the OTG cable or supplies 5 V to the device.
-  - Likely fix: enable both PM8150B nodes, connect the Type-C port to the DWC3 role switch (`usb-role-switch`, `dr_mode = "otg"`), and confirm the USB gadget (SSH over `172.16.42.1`) still works in device mode. The OnePlus 7T Pro bringup (`hotdog-linux-bringup/`) is a reference.
+- [x] **USB host (OTG)** — verified 2026-10-12
+  - Before: a USB thumb drive did not show up at all. The DWC3 controller (`usb@a600000`) was fixed to `dr_mode = "peripheral"`, and the PM8150B Type-C port (`typec@1500`) and VBUS regulator (`usb-vbus-regulator@1100`) were disabled.
+  - Fix (device tree only; the kernel config already had `TYPEC_QCOM_PMIC`, `USB_ROLE_SWITCH`, `USB_DWC3_DUAL_ROLE` and `REGULATOR_QCOM_USB_VBUS`): enabled both PM8150B nodes, gave the Type-C port a dual-role `usb-c-connector` (`vdd-pdphy-supply` = the HS PHY 3.1 V rail, source PDO 5 V / 1.5 A, sink PDO 5 V / 3 A), switched the controller to `dr_mode = "otg"` with `usb-role-switch`, and connected the connector to the controller's HS port (data role) and to the QMP combo PHY (`orientation-switch`, SuperSpeed lanes). Modelled on `hotdog-linux-bringup` patches 0048/0049.
+  - Verified: a SanDisk thumb drive (`0781:55a9`) enumerated at SuperSpeed on `xhci-hcd` and opened in Files. Attached to a PC the port reports `[sink]` / `[device]`, USB gadget SSH works and the VBUS boost stays off.
+  - Not done: the FSA4480 SBU/audio switch (`i2c@890000` 0x42 in the stock DT) and DisplayPort alternate mode.
 
 ---
 
