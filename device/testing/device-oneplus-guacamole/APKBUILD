@@ -4,7 +4,7 @@ maintainer="Casey Connolly <kcxt@postmarketos.org>"
 pkgname=device-oneplus-guacamole
 pkgdesc="OnePlus 7 Pro"
 pkgver=4
-pkgrel=5
+pkgrel=6
 url="https://postmarketos.org"
 license="MIT"
 arch="aarch64"
@@ -15,6 +15,7 @@ depends="
 	mkbootimg
 	alsa-ucm-conf
 	bluez-btmgmt
+	e2fsprogs-extra
 	postmarketos-base
 	msm-modem
 	rmtfs
@@ -38,6 +39,8 @@ source="
 	guacamole-bdaddr
 	guacamole-bdaddr.service
 	90-guacamole-bdaddr.rules
+	guacamole-wlanmac
+	90-guacamole-wlanmac.rules
 "
 
 build() {
@@ -71,6 +74,12 @@ package() {
 		"$pkgdir/usr/lib/systemd/system/guacamole-bdaddr.service"
 	install -Dm644 "$srcdir/90-guacamole-bdaddr.rules" \
 		"$pkgdir/usr/lib/udev/rules.d/90-guacamole-bdaddr.rules"
+
+	# Wi-Fi: factory MAC as the interface address (NetworkManager still
+	# applies its per-network stable MAC while connected).
+	install -Dm755 "$srcdir/guacamole-wlanmac" "$pkgdir/usr/libexec/guacamole-wlanmac"
+	install -Dm644 "$srcdir/90-guacamole-wlanmac.rules" \
+		"$pkgdir/usr/lib/udev/rules.d/90-guacamole-wlanmac.rules"
 }
 
 openrc() {
@@ -110,4 +119,6 @@ b3dc15594284308d6d413d0b54d7d24246514e747eaf1b39999c417a5340b243ce4e7d3d250cc813
 13d7118458c6eb54c59b76d24ad2cd19f90f4227bc6dc38f2da82e74d638f998d4fbe3baf09f5c96d7309510138575b671efe2c0a819adbadf6f9e8be0f98bee  guacamole-bdaddr
 0a475cbb04f25cd09c943deed6109cf0a9367ceda57284b18a6ce80402f9cd802f352bca06df5305cc64b5845149c09804dd44604aab31dfb090dea29befb5a7  guacamole-bdaddr.service
 2a1b701c9efb5281e2db68932a9d832421fdfa6272094f6aa184c2959cee3370b8725e4c07c671b555a2a4021740ceab7b62ebf119b702ef810c848664c9116f  90-guacamole-bdaddr.rules
+a6a258a95f57e3c68b7d48bb019d9bfb170b5ca7617ac320652906b2998aaf8b63021cbff8900e72b855de05cc47c5702fc61f7dbafeef2a331dae092c6599fe  guacamole-wlanmac
+be1a5cb1c37b8ddda6b8d5cce2dd3596be44fefed67c75493abd4ad15d5041601493a0d9f2823b67825d2940f11b36274f05ebf8ce0113bd42e972aac20ad187  90-guacamole-wlanmac.rules
 "

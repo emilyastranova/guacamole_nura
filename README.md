@@ -42,7 +42,7 @@ This repository contains the bringup workspace, kernel patches, device tree sour
 | **Camera** | :x: Not Working | SM8150 CAMSS / CCI | Not started; see "Camera" in `docs/PLAN.md` |
 | **Volume Keys** | :white_check_mark: Working | `gpio-keys` (PM8150 GPIO 6/7) | Volume up/down report `KEY_VOLUMEUP`/`KEY_VOLUMEDOWN` |
 | **GPU Acceleration** | :white_check_mark: Working | Adreno 640 / Mesa Freedreno & Turnip | GMU v2.0.261 + ZAP shader loaded; native OpenGL ES 3.2 and Vulkan 1.3 |
-| **Wi-Fi** | :white_check_mark: Working | `ath10k_snoc` (WCN3990) | 2.4 and 5 GHz, DHCP and internet; OxygenOS 12-era WLAN firmware + kernel patch `0009`. Stable MAC and WoWLAN pending |
+| **Wi-Fi** | :white_check_mark: Working | `ath10k_snoc` (WCN3990) | 2.4 and 5 GHz, DHCP and internet; OxygenOS 12-era WLAN firmware + kernel patch `0009`. Factory MAC as the interface address; NetworkManager uses a stable per-network MAC when connected. WoWLAN pending |
 | **Bluetooth** | :white_check_mark: Working | `hci_qca` (WCN3990) on UART13 | Scanning and HID devices; stable address from the factory Wi-Fi MAC; audio profiles untested |
 | **Modem / MPSS** | :construction: DSP running | Hexagon remoteproc / PAS | Modem DSP runs and hosts the WLAN firmware; cellular (ModemManager, SIM, calls, data) not working; see "Wi-Fi, Bluetooth & Modem Bringup" in `docs/PLAN.md` |
 | **Audio** | :white_check_mark: Speakers & Mic | QDSP6 ADSP + 2x NXP TFA9874 (QUAT MI2S) + WCD9340 (SLIMbus) | Stereo speakers and internal mic working via UCM2; earpiece/call audio and speaker protection pending |
@@ -147,7 +147,7 @@ guacamole_nura/
   - Secondary microphones, speaker protection and default volume limits.
   - Settle on one sound server (PulseAudio vs PipeWire).
 - [ ] **Wi-Fi, Bluetooth & Modem Bringup** (see "Wi-Fi, Bluetooth & Modem Bringup" in `docs/PLAN.md`):
-  - Give `wlan0` a stable MAC address and test WoWLAN.
+  - Test WoWLAN.
   - Validate SIM, SMS, mobile data and calls via ModemManager.
 - [ ] **Firmware decompilation** (long term): reverse-engineer the proprietary blobs listed under "Proprietary Firmware (Decompilation Targets)" towards open-source replacements, starting with the WCN3990 Wi-Fi and Bluetooth firmware.
 - [ ] **Auto-rotate** (see "Sensors" in `docs/PLAN.md`).

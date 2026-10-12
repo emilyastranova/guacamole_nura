@@ -1,0 +1,3 @@
+# Assign the factory MAC to the WCN3990 Wi-Fi interface before NetworkManager
+# manages it.
+ACTION=="add", SUBSYSTEM=="net", KERNEL=="wlan0", DRIVERS=="ath10k_snoc", RUN+="/usr/libexec/guacamole-wlanmac $name"

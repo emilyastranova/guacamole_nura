@@ -1,0 +1,30 @@
+#!/bin/sh
+# Give the WCN3990 Wi-Fi interface its factory MAC address.
+#
+# ath10k_snoc takes its address from the device tree or the firmware, and
+# neither carries the factory MAC, so wlan0 comes up with a locally
+# administered address. The factory MAC is stored on the persist partition
+# (wlan_mac.bin, Intf0MacAddress). Read it once, cache it, and set it on the
+# interface. udev runs this from the wlan0 "add" event, before NetworkManager
+# takes over the device, so the interface is still down.
+set -e
+
+iface=${1:-wlan0}
+state=/var/lib/guacamole/wlanmac
+
+if [ ! -s "$state" ]; then
+	# udevd's seccomp filter blocks mount(2), so read the file from the
+	# ext4 image directly; debugfs opens it read-only.
+	mac=$(debugfs -R "cat /wlan_mac.bin" /dev/disk/by-partlabel/persist 2>/dev/null |
+		sed -n 's/^Intf0MacAddress=//p' | tr -d '\r\n')
+
+	case "$mac" in
+	[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]) ;;
+	*) echo "guacamole-wlanmac: no usable Wi-Fi MAC in persist" >&2; exit 1 ;;
+	esac
+
+	mkdir -p "${state%/*}"
+	echo "$mac" | sed -E 's/(..)/\1:/g; s/:$//' > "$state"
+fi
+
+ip link set dev "$iface" address "$(cat "$state")"
