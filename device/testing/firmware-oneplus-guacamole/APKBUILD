@@ -1,7 +1,7 @@
 pkgname=firmware-oneplus-guacamole
-pkgdesc="OnePlus 7 Pro firmware (WiFi, Bluetooth, modem, GPU zap shader)"
+pkgdesc="OnePlus 7 Pro firmware (WiFi, Bluetooth, modem, IPA, GPU zap shader)"
 pkgver=1
-pkgrel=4
+pkgrel=5
 url="https://github.com/M1DNYT3/firmware-oneplus-guacamole"
 license="proprietary"
 arch="aarch64"
@@ -69,6 +69,10 @@ package() {
 			"$pkgdir/lib/firmware/postmarketos/qcom/sm8150/oneplus7/$f"
 	done
 
+	# IPA firmware, loaded by the AP (qcom,gsi-loader = "self") for the modem data path
+	install -Dm644 "$fw/qcom/sm8150/oneplus7/ipa_fws.mbn" \
+		"$pkgdir/lib/firmware/qcom/sm8150/oneplus7/ipa_fws.mbn"
+
 	# WCN3990 Bluetooth rampatch and NVM (OxygenOS 12-era, from the LineageOS bluetooth partition)
 	for f in crbtfw21.tlv crnv21.bin; do
 		install -Dm644 "$fw/qca/$f" "$pkgdir/lib/firmware/qca/$f"
@@ -81,7 +85,7 @@ package() {
 
 sha512sums="
 df0d8e88765556dc82781fed96d7e8ae91edab89cf43ba492b392a2e6679713c99952f2ea2f236f9279e476730f2b3b0361bcae53ed16ae0d3d856d682853b8e  30-gpu-firmware.files
-0b9e6eacff8196eb243eecfc66c54dfcb2c5223f172c9acdb1c42c660a8cee1dd1a4bec195c43feb44591617c50080abce5803325541aa750199c9b052b7914e  firmware-oneplus-guacamole-24.0-20261011.tar.gz
+e4fb5b4c1ee7dbbdc83a92e19dad96e27d787075af23c86928393d23cb521c811eb0ed98999b32e0cf6ff876662110ca5705315fca1199557ae3e5ef5534ac71  firmware-oneplus-guacamole-24.0-20261011.tar.gz
 7dce040ac3e1452be43dea64ba2cf7b2b3703371d233c28e9ed768b55fa012dd78104208fcb5e4eccf17cece289d9a09bc0f92227766b40eb99fc5921caa547c  firmware-5.bin
 95f70f93df6b6f9f56b0bf3f5b4699f3dc676f1132d5fd47f6f0cdb9435634ef8a2f54deea47c1823edcdd1d5fc5d8ab185eb959b1becc27bbdf86803b06148d  a640_zap.mdt
 65481da7c71a90a0f083cd74e58166a398396b95ae166722026dab9973ae68c94c17698ab5ac56241d5fa9d091ec3a79fef1d477e1f44e388bea968937b1dbc7  a640_zap.b00

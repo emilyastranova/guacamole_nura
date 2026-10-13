@@ -11,13 +11,15 @@ firmware-oneplus-guacamole package installs:
     wlanmdsp.mbn
     ath10k/WCN3990/hw1.0/board-2.bin   (bdwlan.bin as 'bus=snoc,qmi-board-id=ff')
     qca/crbtfw21.tlv, qca/crnv21.bin   (WCN3990 Bluetooth, from the bluetooth partition)
+    qcom/sm8150/oneplus7/ipa_fws.mbn   (IPA firmware, /firmware/ipa_fws.elf in the vendor partition)
 
 Usage:
     scripts/extract_lineage_firmware.py <lineage-*-guacamole-signed.zip> [outdir]
 
 Writes <outdir>/firmware-oneplus-guacamole-<lineage build>.tar.gz (deterministic:
 sorted entries, fixed mtime/owner) plus a VERSIONS file. Requires `mcopy`
-(mtools) to read the FAT modem image.
+(mtools) to read the FAT modem and bluetooth images and `debugfs` (e2fsprogs)
+to read the ext4 vendor image.
 """
 import bz2
 import gzip
@@ -37,6 +39,8 @@ MODEM_DIR = "qcom/sm8150/oneplus7"
 BT_DIR = "qca"
 BT_FILES = ("crbtfw21.tlv", "crnv21.bin")
 BOARD_PATH = "ath10k/WCN3990/hw1.0/board-2.bin"
+IPA_SRC = "/firmware/ipa_fws.elf"
+IPA_PATH = "%s/ipa_fws.mbn" % MODEM_DIR
 BOARD_NAME = b"bus=snoc,qmi-board-id=ff"
 
 
@@ -160,8 +164,9 @@ def main():
         raise SystemExit(__doc__)
     ota = sys.argv[1]
     outdir = sys.argv[2] if len(sys.argv) == 3 else "build"
-    if not shutil.which("mcopy"):
-        raise SystemExit("mcopy (mtools) is required")
+    for tool in ("mcopy", "debugfs"):
+        if not shutil.which(tool):
+            raise SystemExit("%s is required" % tool)
     m = re.search(r"lineage-([0-9.]+-[0-9]{8})", os.path.basename(ota))
     build = m.group(1) if m else "unknown"
 
@@ -190,6 +195,17 @@ def main():
         for name in BT_FILES:
             files["%s/%s" % (BT_DIR, name)] = open(os.path.join(bt_dir, "image", name), "rb").read()
         bt = version_string(os.path.join(bt_dir, "image", "crbtfw21.tlv"), b"BTFM")
+
+        # IPA firmware: a single signed ELF that the AP loads through PAS
+        # (qcom,gsi-loader = "self"); mainline expects the .mbn name.
+        vendor_img = os.path.join(tmp, "vendor.img")
+        extract_partition(ota, "vendor", vendor_img)
+        ipa = os.path.join(tmp, "ipa_fws.elf")
+        subprocess.run(["debugfs", "-R", "dump %s %s" % (IPA_SRC, ipa), vendor_img],
+                       check=True, capture_output=True)
+        files[IPA_PATH] = open(ipa, "rb").read()
+        if files[IPA_PATH][:4] != b"\x7fELF":
+            raise SystemExit("%s in the vendor partition is not an ELF" % IPA_SRC)
 
     os.makedirs(outdir, exist_ok=True)
     base = "firmware-oneplus-guacamole-%s" % build

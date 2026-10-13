@@ -800,6 +800,7 @@
 		memory@98700000 {
 			reg = <0x00 0x98b00000 0x00 0x10000>;
 			no-map;
+			phandle = <0x538>;
 		};
 
 		memory@98710000 {
@@ -907,6 +908,19 @@
 			interrupt-controller;
 			#interrupt-cells = <0x02>;
 			phandle = <0x7b>;
+		};
+
+		ipa-ap-to-modem {
+			qcom,entry-name = "ipa";
+			#qcom,smem-state-cells = <0x01>;
+			phandle = <0x535>;
+		};
+
+		ipa-modem-to-ap {
+			qcom,entry-name = "ipa";
+			interrupt-controller;
+			#interrupt-cells = <0x02>;
+			phandle = <0x536>;
 		};
 	};
 
@@ -1790,6 +1804,7 @@
 			reg = <0x00 0x1620000 0x00 0x19400>;
 			#interconnect-cells = <0x02>;
 			qcom,bcm-voters = <0x5f>;
+			phandle = <0x537>;
 		};
 
 		interconnect@163a000 {
@@ -2723,6 +2738,26 @@
 				phandle = <0x520>;
 			};
 
+		};
+
+		ipa@1e40000 {
+			compatible = "qcom,sm8150-ipa";
+			iommus = <0x2b 0x520 0x00 0x2b 0x522 0x00>;
+			reg = <0x00 0x1e40000 0x00 0x7000 0x00 0x1e47000 0x00 0x4000 0x00 0x1e04000 0x00 0x2c000>;
+			reg-names = "ipa-reg", "ipa-shared", "gsi";
+			interrupts-extended = <0x01 0x00 0x137 0x01 0x01 0x00 0x1b0 0x04 0x536 0x00 0x01 0x536 0x01 0x01>;
+			interrupt-names = "ipa", "gsi", "ipa-clock-query", "ipa-setup-ready";
+			clocks = <0x29 0x0c>;
+			clock-names = "core";
+			interconnects = <0x6d 0x09 0x00 0x06 0x01 0x00 0x6d 0x09 0x00 0x537 0x0a 0x00 0x05 0x00 0x00 0xb7 0x15 0x00>;
+			interconnect-names = "memory", "imem", "config";
+			qcom,qmp = <0x71>;
+			qcom,smem-states = <0x535 0x00 0x535 0x01>;
+			qcom,smem-state-names = "ipa-clock-enabled-valid", "ipa-clock-enabled";
+			qcom,gsi-loader = "self";
+			memory-region = <0x538>;
+			firmware-name = "qcom/sm8150/oneplus7/ipa_fws.mbn";
+			status = "okay";
 		};
 
 		remoteproc@4080000 {

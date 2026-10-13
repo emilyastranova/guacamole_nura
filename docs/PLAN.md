@@ -171,9 +171,15 @@ Wi-Fi connects on 2.4 GHz and 5 GHz and Bluetooth works. Cellular is not working
   - The `linux-firmware` files (`20260810`: `crbtfw21.tlv` `BTFM.CHE.2.1.3`, generic `crnv21.bin`) also work: setup, scanning and a paired MX Master 3S tested 2026-10-12 by bind-mounting them and rebinding `hci_uart_qca`. They are the fallback if the LineageOS extraction is dropped; the package keeps the newer LineageOS build with OnePlus NV data.
   - The controller has no programmed address and ABL passes no `local-bd-address`, so the kernel registers it as unconfigured and BlueZ ignores it ("no adapter" in GNOME Settings). `device-oneplus-guacamole` r5 adds `guacamole-bdaddr` (udev rule and oneshot service). On first run it derives a stable address from the factory Wi-Fi MAC in `persist/wlan_mac.bin` (last byte + 1), caches it in `/var/lib/guacamole/bdaddr`, and applies it with `btmgmt public-addr` once the controller reports the address missing (it waits up to 20 s, since udev starts it before the QCA firmware setup finishes). Verified on a fresh boot 2026-10-12. The stock `persist/bluetooth` directory is empty, so the real address lives in modem NV.
   - Still to check: audio profiles (A2DP/HFP need the audio routing work), and Bluetooth/Wi-Fi coexistence under load.
-- [ ] **Cellular data & calls**
-  - Verify QMI/QRTR modem exposure and ModemManager detection.
-  - Test SIM detection, SMS, mobile data, and voice calls (voice audio depends on the audio subsystem work).
+- [x] **IPA data path and ModemManager detection** — verified 2026-10-13
+  - ModemManager found the QMI modem over QRTR but refused it ("Failed to find a net port in the QMI modem"): mainline 6.17 has no IPA v4.1 (SM8150) support, so there was no `rmnet_ipa0`.
+  - Kernel patches `0013` (IPA v4.1 platform data) and `0014` (v4.1 register definitions) from `hotdog-linux-bringup` 0144/0145, `0015` (bounded `gsi_trans_commit_wait()`, so a modem crash cannot wedge recovery from the SSR notifier) and `0016` (`ENDP_INIT_CTRL` for v4.1, used by `ipa_endpoint_program_delay()` below v4.2), both from hotdog 0156.
+  - Device tree: `ipa@1e40000` (`qcom,sm8150-ipa`, SIDs 0x520/0x522, SPI 311/432, `RPMH_IPA_CLK`, interconnects memory/imem/config, `qcom,qmp`), `ipa-ap-to-modem`/`ipa-modem-to-ap` entries under `smp2p-mpss`, a phandle on `system-noc`, and `qcom,gsi-loader = "self"` with `memory-region` = the stock `pil_ipa_fw_region` (`0x98b00000`, 64 KiB) and `firmware-name = "qcom/sm8150/oneplus7/ipa_fws.mbn"`.
+  - Firmware: `ipa_fws.mbn` is the single-file `ipa_fws.elf` from the LineageOS `vendor` partition (`/firmware/`), extracted by `scripts/extract_lineage_firmware.py` with `debugfs`; packaged in `firmware-oneplus-guacamole` r5. The stock `vendor_b` copy and the sm8150-mainline GitLab copy are different builds with the same layout; the stock copy was used for the first boot.
+  - Result: "IPA driver setup completed successfully", modem starting/running events, `rmnet_ipa0` created, and ModemManager creates the modem (`qcom-soc`, ports `qrtr0` and `rmnet_ipa0`, IMEI and MPSS revision read). State is `failed: sim-missing`; UIM reports both physical slots `absent`.
+  - Not applied from hotdog 0156: the IPA `no_system_suspend` diagnostic, the remoteproc proxy power-domain hold and wdog/fatal IRQ wakeups (candidates for the suspend work).
+- [ ] **Cellular data & calls** (needs a SIM)
+  - Test SIM detection and `msm-modem-uim-selection`, registration, SMS, mobile data (`rmnet` QMAP links over `rmnet_ipa0`), and voice calls (voice audio depends on the audio subsystem work).
 
 ---
 
