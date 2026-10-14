@@ -8,7 +8,7 @@ partition from the OTA's payload.bin and packs the files the
 firmware-oneplus-guacamole package installs:
 
     qcom/sm8150/oneplus7/modem.mdt, modem.bNN, modemr.jsn, modemuw.jsn,
-    wlanmdsp.mbn
+    wlanmdsp.mbn, slpir.jsn, slpius.jsn (SLPI protection-domain maps)
     ath10k/WCN3990/hw1.0/board-2.bin   (bdwlan.bin as 'bus=snoc,qmi-board-id=ff')
     qca/crbtfw21.tlv, qca/crnv21.bin   (WCN3990 Bluetooth, from the bluetooth partition)
     qcom/sm8150/oneplus7/ipa_fws.mbn   (IPA firmware, /firmware/ipa_fws.elf in the vendor partition)
@@ -178,7 +178,7 @@ def main():
 
         files = {}
         for name in sorted(os.listdir(src)):
-            if re.fullmatch(r"modem\.(mdt|b[0-9]{2})|modemr\.jsn|modemuw\.jsn|wlanmdsp\.mbn", name):
+            if re.fullmatch(r"modem\.(mdt|b[0-9]{2})|modemr\.jsn|modemuw\.jsn|wlanmdsp\.mbn|slpir\.jsn|slpius\.jsn", name):
                 files["%s/%s" % (MODEM_DIR, name)] = open(os.path.join(src, name), "rb").read()
         if "%s/modem.mdt" % MODEM_DIR not in files or "%s/wlanmdsp.mbn" % MODEM_DIR not in files:
             raise SystemExit("modem.mdt or wlanmdsp.mbn missing from the modem partition")

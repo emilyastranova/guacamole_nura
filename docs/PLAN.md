@@ -34,7 +34,7 @@ flowchart TD
     H --> I[Wi-Fi, Bluetooth & Modem - NOT WORKING]
     I --> J[Battery & Charging - WORKING]
     J --> L[Volume Keys - WORKING]
-    L --> M[Auto-rotate & brightness / SLPI sensors - NOT WORKING]
+    L --> M[Auto-rotate & brightness / SLPI sensors - IN PROGRESS]
     M --> N[Camera - NOT WORKING]
     N --> K[Upstreaming & Maintenance - PLANNED]
 ```
@@ -209,13 +209,22 @@ Battery percentage, charging and the plugged-in/unplugged state work. The charge
 - [ ] **Graphics name**: Mesa freedreno reports the GL renderer as `FD640`. It should read "Qualcomm Adreno 640". Needs a Mesa renderer-name change or a gnome-control-center `info_cleanup` rule.
 
 ### Sensors
-- [ ] **Auto-rotate (accelerometer)**
-  - The stock device tree has no accelerometer on an AP-visible bus; the motion sensors sit behind the SLPI sensor DSP (Qualcomm SSC).
-  - Needs the SLPI remoteproc, the sensor firmware/registry, and an SSC client in userspace feeding `iio-sensor-proxy`. Reference: `hotdog-linux-bringup/docs/evidence/*slpi*`, `*sensor*` (OnePlus 7T Pro).
+- [x] **SLPI sensor DSP and accelerometer** — accelerometer streaming verified 2026-10-14; Phosh auto-rotate seen working once (180° off before the mount-matrix rule); boot ordering not yet verified across a clean boot
+  - The stock device tree has no accelerometer on an AP-visible bus; the motion sensors sit behind the SLPI sensor DSP (Qualcomm SSC / SEE). The path is SLPI remoteproc → FastRPC (`/dev/fastrpc-sdsp`) → `hexagonrpcd` serving the sensor files → `iio-sensor-proxy` (libssc, QMI over QRTR to SSC service 400) → `net.hadess.SensorProxy` → Phosh. No IIO or input device exists.
+  - Firmware: `slpi.mdt`/`slpi.bNN` `SLPI.HY.2.2-00083` (OxygenOS 11) from the M1DNYT3 repository, `firmware-oneplus-guacamole` r6, plus `slpir.jsn`/`slpius.jsn` from the LineageOS modem image. The phone's `modem_b` carries the same version (a different OEM build). The LineageOS OTA carries `2.2-00121`, which on the OnePlus 7T Pro never instantiated the LSM6DSM, so it is not used.
+  - Device tree: `remoteproc@2400000` enabled with the firmware name; a 16 MiB `fastrpc-shared-pool` (`shared-dma-pool`, `alloc-ranges` below 4 GiB, `reusable`) as `memory-region` of the SDSP `fastrpc` node with `qcom,vmids = <3 5 6>` (HLOS, SSC_Q6, ADSP_Q6), from hotdog patch 0126. `slpi_mem` is already the stock `0x97700000` region.
+  - Kernel patch `0017` (hotdog 0148 without its log line): `fastrpc_get_args()` allocates the sensors PD's message buffers from the reserved pool; a context-bank IOVA stalls the interconnect instead of faulting.
+  - Userspace, `device-oneplus-guacamole` r7: depends on `hexagonrpcd` (served tree `/usr/share/qcom`: `sensors/config` 61 JSONs and `sensors/sns_reg.conf` from `vendor_b`, `sdsp/` libraries from `dsp_b`, `socinfo/` with `hw_platform` `MTP` and `soc_id` 339, `project_info/project_name` from `androidboot.project_name` = 18821). The registry is per unit: `guacamole-sensors-registry.service` imports `persist` → `/sensors/registry` with `debugfs` on first boot into `/var/lib/guacamole/sensors/registry` (symlinked from the served tree; packaged snapshot as fallback). `90-guacamole-sensors.rules` starts the registry import, `hexagonrpcd-sdsp.service` and `iio-sensor-proxy.service` when `/dev/fastrpc-sdsp` appears (about 12 s into boot); the `iio-sensor-proxy` drop-in orders it after `hexagonrpcd-sdsp` with an 8 s delay. `scripts/extract_sensor_files.sh` builds the local tarball from the phone.
+  - Local package builds (aports in `device/testing/`): `hexagonrpcd` 0.4.0-r4 with the hotdog writable-file-service patches (the DSP rewrites about 200 registry files per boot; stock 0.4.0 refused every write, which did not stop the accelerometer but loses calibration updates), and `iio-sensor-proxy` 3.9-r3 with a port of hotdog patch 0010 (discover and open the sensors before exporting the D-Bus objects, so a client watching the bus name never sees `HasAccelerometer` false or claims a sensor that is not open yet).
+  - Sensors this unit has (from its persist registry and the firmware's driver set): LSM6DSM accelerometer + gyroscope on SPI 2 (factory bias in `lsm6dsm_0_platform.*.fac_cal.bias`, `ver 1`), TCS3701 light/proximity on I2C 3 at 0x39, a magnetometer (MMC5603 at 0x30 or AK0991x at 0x0c on I2C 1; not identified), SX9324/SX932x SAR on I2C 3. `iio-sensor-proxy` discovers `accel` (SUID `2286538866409242278 11115320498015681092`, the same as the 7T Pro), `ambient_light` and `proximity`; the accelerometer streams at 26 Hz (`Accel sent by driver: 0, 0, 9` lying flat).
+  - Mount matrix: the IMU is rotated 180° about Z, so Phosh rotated the screen upside down. `61-guacamole-accel-mount-matrix.rules` sets `ACCEL_MOUNT_MATRIX="-1, 0, 0; 0, -1, 0; 0, 0, 1"` on the FastRPC nodes (SEE's own placement matrix is reported as all zero).
+  - Phosh only holds the accelerometer while the screen is on and unlocked, so `AccelerometerOrientation` reads `undefined` on an idle phone; test with the screen awake.
+  - Pitfalls (from the 7T Pro notes, confirmed here where tested): the SLPI cannot be restarted hot; the sensor PD is created on the first FastRPC attach only, so never restart `hexagonrpcd` after it attached (reboot instead); `sudo` is needed for `monitor-sensor` over SSH (the D-Bus policy refuses claims from a session-less user).
+  - Still to do: verify auto-rotate across a clean boot (ordering of Phosh vs the sensor daemon), gyroscope/magnetometer/compass, and the IMU temperature.
 
 - [ ] **Automatic brightness (ambient light sensor)**
-  - The stock device tree has no ambient light sensor on an AP-visible bus; like the accelerometer it is reached through the SLPI sensor DSP. On the OnePlus 7T Pro it is a TCS3701 (light and proximity); identify the 7 Pro part from the SLPI sensor registry.
-  - Same dependency as auto-rotate: SLPI remoteproc, sensor registry, an SSC client feeding `iio-sensor-proxy`. Reference: `hotdog-linux-bringup/docs/evidence/*alsps*`, `*tcs3701*`, `*als-type*`.
+  - The TCS3701 (light and proximity, I2C 3 at 0x39) is reached through the same SLPI path; `iio-sensor-proxy` reports `HasAmbientLight` and `HasProximity` true since 2026-10-14.
+  - Still to do: check `LightLevel` tracks the room, and wire automatic brightness in the UI (Phosh/gsd `ambient-enabled`). Proximity during calls depends on call audio.
 
 ### Camera
 - [ ] **Cameras**

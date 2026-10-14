@@ -830,6 +830,14 @@
 			no-map;
 		};
 
+		fastrpc-shared-pool {
+			compatible = "shared-dma-pool";
+			alloc-ranges = <0x00 0x00 0x00 0xffffffff>;
+			size = <0x00 0x1000000>;
+			reusable;
+			phandle = <0x539>;
+		};
+
 		memory@f2901000 {
 			compatible = "qcom,rmtfs-mem";
 			reg = <0x00 0xf2901000 0x00 0x200000>;
@@ -2077,7 +2085,8 @@
 			qcom,qmp = <0x71>;
 			qcom,smem-states = <0x72 0x00>;
 			qcom,smem-state-names = "stop";
-			status = "disabled";
+			status = "okay";
+			firmware-name = "qcom/sm8150/oneplus7/slpi.mdt";
 
 			glink-edge {
 				interrupts = <0x00 0xaa 0x01>;
@@ -2090,6 +2099,8 @@
 					qcom,glink-channels = "fastrpcglink-apps-dsp";
 					label = "sdsp";
 					qcom,non-secure-domain;
+					memory-region = <0x539>;
+					qcom,vmids = <0x03 0x05 0x06>;
 					#address-cells = <0x01>;
 					#size-cells = <0x00>;
 

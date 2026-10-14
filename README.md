@@ -37,8 +37,8 @@ This repository contains the bringup workspace, kernel patches, device tree sour
 | **USB Peripheral** | :white_check_mark: Working | `dwc3-qcom` / USB gadget | CDC NCM / RNDIS gadget for SSH (`user@172.16.42.1`) |
 | **USB Host (OTG)** | :white_check_mark: Working | `dwc3-qcom` role switch + PM8150B Type-C / VBUS | Dual-role port managed by `qcom,pmic-typec`; a USB thumb drive enumerates at SuperSpeed and mounts in Files. USB gadget/SSH still works when attached to a PC |
 | **Battery & Charging** | :construction: WIP | `bq27411` gauge + PM8150B SMB5 charger | Percentage, charging and plugged-in state work (4.35 V / 1.5 A, kernel patches `0011`, `0012`); charge-limit daemon and wall-charger charging are WIP |
-| **Auto-rotate** | :x: Not Working | SLPI sensor DSP (SSC) | Accelerometer is behind the sensor DSP; see "Sensors" in `docs/PLAN.md` |
-| **Brightness Sensor** | :x: Not Working | SLPI sensor DSP (SSC) | Ambient light sensor is behind the sensor DSP, like the accelerometer; see "Sensors" in `docs/PLAN.md` |
+| **Auto-rotate** | :construction: WIP | SLPI sensor DSP (SSC) + `hexagonrpcd` + `iio-sensor-proxy` | LSM6DSM accelerometer streams at 26 Hz through the sensor DSP (kernel patch `0017`, SLPI firmware, patched `hexagonrpcd`/`iio-sensor-proxy`); Phosh rotation seen once, boot ordering still being verified; see "Sensors" in `docs/PLAN.md` |
+| **Brightness Sensor** | :construction: Detected | SLPI sensor DSP (SSC) | TCS3701 light/proximity sensor is discovered by `iio-sensor-proxy`; automatic brightness not wired up yet |
 | **Camera** | :x: Not Working | SM8150 CAMSS / CCI | Not started; see "Camera" in `docs/PLAN.md` |
 | **Volume Keys** | :white_check_mark: Working | `gpio-keys` (PM8150 GPIO 6/7) | Volume up/down report `KEY_VOLUMEUP`/`KEY_VOLUMEDOWN` |
 | **GPU Acceleration** | :white_check_mark: Working | Adreno 640 / Mesa Freedreno & Turnip | GMU v2.0.261 + ZAP shader loaded; native OpenGL ES 3.2 and Vulkan 1.3 |
@@ -82,6 +82,8 @@ All DSP and radio firmware is closed-source Qualcomm code. These blobs are long-
 | `crbtfw21.tlv`, `crnv21.bin` | `BTFM.CHE.2.1.5` | WCN3990 Bluetooth core | LineageOS 24 OTA |
 | `modem.mdt` / `modem.bNN` | `MPSS.HE.1.0` (OxygenOS 11) | Modem Hexagon DSP | OxygenOS 11 |
 | `ipa_fws.mbn` | — | IPA (modem data path) GSI firmware, loaded via TrustZone PAS | LineageOS 24 OTA (`vendor`) |
+| `slpi.mdt` / `slpi.bNN` | `SLPI.HY.2.2-00083` (OxygenOS 11) | Sensor DSP (SSC/SEE, LSM6DSM, TCS3701, magnetometer, SAR drivers) | M1DNYT3 firmware repository |
+| `sdsp/*.so`, `fastrpc_shell_2` | OxygenOS 11 | Hexagon libraries loaded into the sensor DSP over FastRPC | stock `dsp_b` partition |
 | `adsp.mdt` / `adsp.bNN` | OxygenOS | Audio DSP | OxygenOS |
 | `a640_zap.mdt` / `a640_zap.bNN` | OxygenOS | GPU secure-mode shader (TrustZone) | OxygenOS |
 | `a640_gmu.bin` | `v2.0.261` | Adreno GPU management unit | `linux-firmware` |
@@ -151,8 +153,9 @@ guacamole_nura/
   - Test WoWLAN.
   - With a SIM: validate registration, SMS, mobile data and calls via ModemManager (the modem is detected and the IPA data path is up).
 - [ ] **Firmware decompilation** (long term): reverse-engineer the proprietary blobs listed under "Proprietary Firmware (Decompilation Targets)" towards open-source replacements, starting with the WCN3990 Wi-Fi and Bluetooth firmware.
-- [ ] **Auto-rotate** (see "Sensors" in `docs/PLAN.md`).
-- [ ] **Brightness sensor** (see "Sensors" in `docs/PLAN.md`).
+- [ ] **Sensors** (see "Sensors" in `docs/PLAN.md`):
+  - (WIP) Verify auto-rotate across a clean boot; gyroscope, magnetometer and IMU temperature.
+  - Automatic brightness from the TCS3701 light sensor.
 - [ ] **Camera** (see "Camera" in `docs/PLAN.md`).
 - [ ] **Battery & Charging** (see "Battery & Charging" in `docs/PLAN.md`):
   - (WIP) Rework `guacamole-chgctrl.daemon` for the `bq27411-0` gauge and mainline charger controls.

@@ -1,7 +1,7 @@
 pkgname=firmware-oneplus-guacamole
-pkgdesc="OnePlus 7 Pro firmware (WiFi, Bluetooth, modem, IPA, GPU zap shader)"
+pkgdesc="OnePlus 7 Pro firmware (WiFi, Bluetooth, modem, IPA, sensor DSP, GPU zap shader)"
 pkgver=1
-pkgrel=5
+pkgrel=6
 url="https://github.com/M1DNYT3/firmware-oneplus-guacamole"
 license="proprietary"
 arch="aarch64"
@@ -12,6 +12,12 @@ _raw="https://raw.githubusercontent.com/M1DNYT3/firmware-oneplus-guacamole/$_com
 
 _gpu="a640_zap.mdt a640_zap.b00 a640_zap.b01 a640_zap.b02"
 _pd="modemuw.jsn"
+# SLPI sensor DSP, SLPI.HY.2.2-00083 (OxygenOS 11). The OxygenOS 12-era build
+# 2.2-00121 in LineageOS OTAs never instantiates the LSM6DSM on the OnePlus 7T
+# Pro, so this older build is used on purpose.
+_slpi="slpi.mdt slpi.b00 slpi.b01 slpi.b02 slpi.b03 slpi.b04 slpi.b05 slpi.b06
+	slpi.b07 slpi.b08 slpi.b09 slpi.b10 slpi.b11 slpi.b12 slpi.b13 slpi.b14
+	slpi.b15 slpi.b16 slpi.b17 slpi.b18 slpi.b19 slpi.b20"
 # OxygenOS 11 modem: fits the 150 MiB mpss_mem region (0x8dc00000-0x97200000).
 # The OxygenOS 12 modem spans 160 MiB and fails with "segment outside memory
 # range" until the reserved-memory map is reworked.
@@ -37,7 +43,7 @@ source="30-gpu-firmware.files
 for _f in $_gpu; do
 	source="$source $_f::$_raw/qcom/$_f"
 done
-for _f in $_pd $_modem; do
+for _f in $_pd $_modem $_slpi; do
 	source="$source $_f::$_raw/qcom/sm8150/oneplus7/$_f"
 done
 
@@ -58,6 +64,16 @@ package() {
 	# MPSS modem firmware (required for WCN3990 WiFi via QRTR/WLFW)
 	for f in $_modem; do
 		install -Dm644 "$srcdir/$f" \
+			"$pkgdir/lib/firmware/qcom/sm8150/oneplus7/$f"
+	done
+
+	# SLPI sensor DSP and its protection-domain maps (userspace pd-mapper)
+	for f in $_slpi; do
+		install -Dm644 "$srcdir/$f" \
+			"$pkgdir/lib/firmware/qcom/sm8150/oneplus7/$f"
+	done
+	for f in slpir.jsn slpius.jsn; do
+		install -Dm644 "$fw/qcom/sm8150/oneplus7/$f" \
 			"$pkgdir/lib/firmware/qcom/sm8150/oneplus7/$f"
 	done
 
@@ -85,7 +101,7 @@ package() {
 
 sha512sums="
 df0d8e88765556dc82781fed96d7e8ae91edab89cf43ba492b392a2e6679713c99952f2ea2f236f9279e476730f2b3b0361bcae53ed16ae0d3d856d682853b8e  30-gpu-firmware.files
-e4fb5b4c1ee7dbbdc83a92e19dad96e27d787075af23c86928393d23cb521c811eb0ed98999b32e0cf6ff876662110ca5705315fca1199557ae3e5ef5534ac71  firmware-oneplus-guacamole-24.0-20261011.tar.gz
+bb1b5157b8c505b35b2bfe5bff2b6661828949dd1b0cdb30b183ca51e4ffa98a284342e73f807bf6e7752c64a82a4832d44b53ba3736a971100b17fc07b20ed2  firmware-oneplus-guacamole-24.0-20261011.tar.gz
 7dce040ac3e1452be43dea64ba2cf7b2b3703371d233c28e9ed768b55fa012dd78104208fcb5e4eccf17cece289d9a09bc0f92227766b40eb99fc5921caa547c  firmware-5.bin
 95f70f93df6b6f9f56b0bf3f5b4699f3dc676f1132d5fd47f6f0cdb9435634ef8a2f54deea47c1823edcdd1d5fc5d8ab185eb959b1becc27bbdf86803b06148d  a640_zap.mdt
 65481da7c71a90a0f083cd74e58166a398396b95ae166722026dab9973ae68c94c17698ab5ac56241d5fa9d091ec3a79fef1d477e1f44e388bea968937b1dbc7  a640_zap.b00
@@ -123,4 +139,26 @@ ab668d11b3c34d95b3e6a7a7c5521d28bd5cfc47a4df05e641ac77d778bb9950faf6c17b374b4bd0
 86b8a09d4db0a51987e2714d5dc33ad67452785b05085042ccfb8b448edc40a1d6b9cb3227aeb770a5bee388affdfea3e0b306b5a5543c144bf7912dbe1e10cb  modem.b29
 c6e6e05cca9e8fb500a9baf3d590937b0f97e541824d286da736457faa75216cd82f0e9e5d05bb098f2677abe6b1e0a9700dc3aeb44316227de4a91d91354f4d  modem.b30
 b7e54b9440794e9842b37052b2062e4a31aaf9d9bc090b8219f4affb5bb63771f14466d0f85a341bc3523077a046fa96cee18c098a93e726569f3ed6c89beb85  modem.b31
+6d36a4a924b7333b5b0ddf373f3ae4e36ce0c73142175157ed0fd49ff5be7934141281b232d8a37616e97448eb92bac0c3e47f06a859976dc994e1e8b1432398  slpi.mdt
+b1068d3cc4ff5b3ac5e294249f32ffa4baeb723e60243298eedc707b69a0cd9fa98381a2b6230016c46f83b83f1c49b975017bdb00bb28069cd5280aa2c3435d  slpi.b00
+b6ee118cd3453cab7aa07d5b8dcffbf78be9b128129b1bdb4e3cd51fed3a3395ecd298d2ed86d49e2e763e06a20322c2a454b0f5414be40f873b439ee7fbde23  slpi.b01
+419ac7fcae331334593ee432720eb29dcbddfb31674677772355220c84da9dcd7a69c577e3428a038c0b42470a797fe534f641b31594003a523a3dddd88f0d61  slpi.b02
+788a9cb4055325418a0772f846e54e831468d9a99100ae57775f60a137452551e183d2754a55a46683314cdeb636b3b271d7b900192726375cb89f5b350447d8  slpi.b03
+8aa71a283ba90230a96747901a2a7ce8d20dd587db7b81d1ac46fede62875b5308ab4a9063b24623134aa6b16028f404f40e47432766fe5f5acbab4ece0ce5e8  slpi.b04
+3b6a4c1d1bafb6c62e581f444a224ca6109854f3e82098f2c02d9cfc53b4d9de99de5398621ab5d94b0114dee0334c0c73015a2746ab95d62ea084fd54c2b2d9  slpi.b05
+f68ba8edcffc5718dd04e13f016bc4fa30460942e52836bc84f2bb337177b43fc87ea32fc5657f3afe9677f609817d1f0009c6d2ba37a18eb2ffb65e58c9529c  slpi.b06
+e7c911538acfbe94ab1cb749b610ac9e575a29de23be7854411e747e42b1ac83b8e2e0adc238b7c09c8fe79add84ae444d923ad67eb175898ca4a30b97fdc7ba  slpi.b07
+c8b5b41f0d85f3bd44a9ebead5d6096252093e4d8de5bc8f1ab581a1f13fb5bd40e2b05ce728098a5468a7142c5fdbab86c97dacf95806b96ef6bc477c38f828  slpi.b08
+1ef536aa237100977249420988fa3cb322059d6911ecb761fa76f966c550c973a3ae1a30a3ba49d782377dd030eefa8bcca6317053ab1672f38afcc4787846d9  slpi.b09
+b9b362ac8b88c1eaae1fa87f8498050450d7aa6c7d07698c3aaf8a355b603b6d535e74b47f6da4b4798b04df58b3b6eb1dbc4782fa07756bce10933ed86017d3  slpi.b10
+2abc3f59f638932d659f5d296bc5f428fba434c2b9ef4130331d8e90dbdd20216d42baf8b25f1403cb92ffce9b5737d56782ef37666270cc813fc02932cdca15  slpi.b11
+f913a1a25d3168a4fdcf37697491ceedc05d4634ac971373e6a9d9d256e21ea6c6b344b94c8e00f4715b063e23f46dcadd78389fff5a42f0baadeefcd0c42fd6  slpi.b12
+0cd0f1abca680bb5ff637fa68f0194d23b0ce9937bc4479a88a76b1d72ac0a03405a6b59be1549cbab9857c8f0089a171bfdfc3c0f6d12397be884d6d557e942  slpi.b13
+9d838f23af2179b40e0f7f587616723498e8463df7ffce40995ca668b2cf62021f5c592e3684717a264de5ce4d2728825610658c58c1ce894efafc5d1a701640  slpi.b14
+b683267504039f0b853a0ec0d99848ecb7d345978fb19cdd5c539c8b084e7b816292e1bc09a503068728c69ad6b31419b7720b1d6ee65aa0ecbf829993a89a45  slpi.b15
+6d3e6576abc70a0e28a2f298f7653412d4964339a22c17e30896473098836add3fe597bb07ff08162063f828841e9f573a1234cb987be2776fee5f864549cad3  slpi.b16
+cefdecbbdb1db4f3e7cd43682dfe0f3c1b1b5d5e23ae410e06de3fe91f8379e7010a0a3bf7bdad1ecd085bf58dfd90babc6b1d8295ca0b276208ed6231788f32  slpi.b17
+b7bface959f7f30173b483a75de26a32d5bdcb4ba8768fb7ca22fd16ef0f62f0d6bbbfaf880e7f8a5de49b6134aa4afd48c5761bf3d5cd76baeab271144158bd  slpi.b18
+9401a60bdb7a0c19c4c11a1f45dcfd2cb291a2ce70c4de0fae8539263d85bef823096af33354f4032331eb64cbe8fb986da2811cdecf8678097a1efa4dc07967  slpi.b19
+8a721e82fda212418fb167cb31f310313f66e560e88c88270b83ab447b0e1b68a2442d3256052e42f9876c0bf847a77f07b7f6ea6a77c1cf305398f093dbf5a9  slpi.b20
 "

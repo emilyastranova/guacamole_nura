@@ -3,7 +3,7 @@ maintainer="Pan Ortiz <panjeoc@proton.me>"
 _flavor="postmarketos-qcom-sm8150"
 pkgname=linux-$_flavor
 pkgver=6.17.0
-pkgrel=14
+pkgrel=15
 pkgdesc="Mainline Kernel fork for SM8150 devices"
 arch="aarch64"
 _carch="arm64"
@@ -48,6 +48,7 @@ source="
 	0014-net-ipa-add-ipa-v4.1-register-definitions.patch
 	0015-net-ipa-bound-gsi-trans-commit-wait.patch
 	0016-net-ipa-v4.1-endp-init-ctrl.patch
+	0017-misc-fastrpc-allocate-sensors-messages-from-the-reserved-pool.patch
 "
 builddir="$srcdir/linux-$_tag"
 
@@ -114,4 +115,5 @@ acaf8fd0728f14d2540c2f9f8cf0b6563a5df2a31aaf5c2dfa2122348ad6465f1b76fab701507c2c
 cbba23a302209890f06884dce26c792dc71af8a8817b6ab85898a474b9aea0d736dfaf9a08411d41a08ccc72f2e4261f64372ab14903768fb7d3886989d8821d  0014-net-ipa-add-ipa-v4.1-register-definitions.patch
 ca71b6c960f8d13d529ef4966a031aee8c2fc755ee6545596578ad76719e0edde62ba8748d6ec7517ba57a39572beeca350fd2b4c883b1d3b48cbb490aa983bb  0015-net-ipa-bound-gsi-trans-commit-wait.patch
 8e086382ba2381dc5d23234648b20836770b025bec196a745e177cae35bf959d22488558127dbe57dfb13697e5bdcdae6353bbc990b3bdf29f8526851d2919fd  0016-net-ipa-v4.1-endp-init-ctrl.patch
+b94243216bd03d7871927790da475443a82d6a207c60f6c6fb0c8cd7218df6fa09bcce4c29a5e9b52ab2cefc842dcacb4f1fb6bb66544d7cda0bed0dd6cbe013  0017-misc-fastrpc-allocate-sensors-messages-from-the-reserved-pool.patch
 "

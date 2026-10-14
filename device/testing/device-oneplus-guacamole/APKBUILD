@@ -4,11 +4,11 @@ maintainer="Casey Connolly <kcxt@postmarketos.org>"
 pkgname=device-oneplus-guacamole
 pkgdesc="OnePlus 7 Pro"
 pkgver=4
-pkgrel=6
+pkgrel=7
 url="https://postmarketos.org"
 license="MIT"
 arch="aarch64"
-options="!check !archcheck"
+options="!check !archcheck !strip !tracedeps"
 depends="
 	firmware-oneplus-guacamole
 	linux-postmarketos-qcom-sm8150
@@ -16,12 +16,21 @@ depends="
 	alsa-ucm-conf
 	bluez-btmgmt
 	e2fsprogs-extra
+	hexagonrpcd
+	hexagonrpcd-systemd
+	hexagonrpcd-udev
+	iio-sensor-proxy
 	postmarketos-base
 	msm-modem
 	rmtfs
 	tqftpserv
 "
 makedepends="devicepkg-dev"
+# Sensor DSP support files read from a OnePlus 7 Pro's stock partitions
+# (vendor_b sensor config, dsp_b SLPI libraries, persist registry snapshot).
+# Not downloadable: generate it next to this APKBUILD with
+#   scripts/extract_sensor_files.sh user@172.16.42.1 device/testing/device-oneplus-guacamole
+_sensors="guacamole-sensors-20261014"
 subpackages="$pkgname-openrc"
 source="
 	deviceinfo
@@ -41,6 +50,12 @@ source="
 	90-guacamole-bdaddr.rules
 	guacamole-wlanmac
 	90-guacamole-wlanmac.rules
+	90-guacamole-sensors.rules
+	61-guacamole-accel-mount-matrix.rules
+	guacamole-sensors-registry
+	guacamole-sensors-registry.service
+	iio-sensor-proxy-guacamole.conf
+	$_sensors.tar.gz
 "
 
 build() {
@@ -80,6 +95,42 @@ package() {
 	install -Dm755 "$srcdir/guacamole-wlanmac" "$pkgdir/usr/libexec/guacamole-wlanmac"
 	install -Dm644 "$srcdir/90-guacamole-wlanmac.rules" \
 		"$pkgdir/usr/lib/udev/rules.d/90-guacamole-wlanmac.rules"
+
+	# Sensors: the SLPI sensor DSP is served its configuration, registry and
+	# libraries by hexagonrpcd from /usr/share/qcom. The registry is per unit
+	# and rewritten by the DSP, so it lives under /var/lib and is imported
+	# from persist on first boot by guacamole-sensors-registry.
+	local q="$pkgdir/usr/share/qcom" sd="$srcdir/$_sensors"
+	mkdir -p "$q/sensors" "$q/socinfo"
+	cp -r "$sd/sensors/config" "$q/sensors/config"
+	install -m644 "$sd/sensors/sns_reg.conf" "$q/sensors/sns_reg.conf"
+	cp -r "$sd/sdsp" "$q/sdsp"
+	printf MTP > "$q/socinfo/hw_platform"
+	printf 339 > "$q/socinfo/soc_id"
+	printf Unknown > "$q/socinfo/platform_subtype"
+	printf 0 > "$q/socinfo/platform_subtype_id"
+	printf 65536 > "$q/socinfo/platform_version"
+	printf 2.2 > "$q/socinfo/revision"
+	ln -s /var/lib/guacamole/sensors/registry "$q/sensors/registry"
+	ln -s /var/lib/guacamole/sensors/project_info "$q/project_info"
+	local f
+	for f in sns_reg_version file1 file2; do
+		ln -s "/var/lib/guacamole/sensors/$f" "$q/sensors/$f"
+	done
+	mkdir -p "$pkgdir/usr/share/guacamole/sensors-registry-default"
+	cp -r "$sd/registry-default/registry" \
+		"$pkgdir/usr/share/guacamole/sensors-registry-default/registry"
+	find "$q" "$pkgdir/usr/share/guacamole" -type f -exec chmod 644 {} +
+	install -Dm755 "$srcdir/guacamole-sensors-registry" \
+		"$pkgdir/usr/libexec/guacamole-sensors-registry"
+	install -Dm644 "$srcdir/guacamole-sensors-registry.service" \
+		"$pkgdir/usr/lib/systemd/system/guacamole-sensors-registry.service"
+	install -Dm644 "$srcdir/90-guacamole-sensors.rules" \
+		"$pkgdir/usr/lib/udev/rules.d/90-guacamole-sensors.rules"
+	install -Dm644 "$srcdir/61-guacamole-accel-mount-matrix.rules" \
+		"$pkgdir/usr/lib/udev/rules.d/61-guacamole-accel-mount-matrix.rules"
+	install -Dm644 "$srcdir/iio-sensor-proxy-guacamole.conf" \
+		"$pkgdir/usr/lib/systemd/system/iio-sensor-proxy.service.d/guacamole.conf"
 }
 
 openrc() {
@@ -121,4 +172,10 @@ b3dc15594284308d6d413d0b54d7d24246514e747eaf1b39999c417a5340b243ce4e7d3d250cc813
 2a1b701c9efb5281e2db68932a9d832421fdfa6272094f6aa184c2959cee3370b8725e4c07c671b555a2a4021740ceab7b62ebf119b702ef810c848664c9116f  90-guacamole-bdaddr.rules
 a6a258a95f57e3c68b7d48bb019d9bfb170b5ca7617ac320652906b2998aaf8b63021cbff8900e72b855de05cc47c5702fc61f7dbafeef2a331dae092c6599fe  guacamole-wlanmac
 be1a5cb1c37b8ddda6b8d5cce2dd3596be44fefed67c75493abd4ad15d5041601493a0d9f2823b67825d2940f11b36274f05ebf8ce0113bd42e972aac20ad187  90-guacamole-wlanmac.rules
+722313af8488dd1e0e19ceed62e002ebb6c09315078d5b2b4730e6084c25c1165049b3a85efdb156a756d06b6387c9d31d5fda280b106bccb003bab54bba99f8  90-guacamole-sensors.rules
+d0a84b5aa02540f3187b92f5c96fac8f5af07b0c3532a32e63eb75614a76b7ad62b166bc2551c2fab68405446bff0a03b3e6f7c7ab1e2e99dafc070a628046ff  61-guacamole-accel-mount-matrix.rules
+1e2b796d12b35c224919a2a0c8bdf263b5f3fe7f63ce0e764b9602816171909764407ce3e5af2fac80d53eb30ca41587a8a3f261b7d4851d3b8931fc84809c7d  guacamole-sensors-registry
+81cf37c601c90e6b208bfcb1dac19d11ec553681958fc2a8ef7f75343a784a7f323e7fefd95780c6e14b0ec0076ac2e2d4a7f43c301d5ddbec8451e070d7504c  guacamole-sensors-registry.service
+6aaa3a7da243fe9ab85065f7894e6bde4004a0ed88714ac06d137804e49426820cb78c4d27137cf6c9e885b6511082a572e76096c6624d541ef6a667b4eadea1  iio-sensor-proxy-guacamole.conf
+a344ed0d7a24a67a8ed222f7cf4991ca29ec195f8e0b69c48e91f75281e1543043b18e462ca2a396c8428bde014f605e284e5358020ca782813364e2fc232193  guacamole-sensors-20261014.tar.gz
 "
