@@ -34,7 +34,7 @@ flowchart TD
     H --> I[Wi-Fi, Bluetooth & Modem - NOT WORKING]
     I --> J[Battery & Charging - WORKING]
     J --> L[Volume Keys - WORKING]
-    L --> M[Auto-rotate & brightness / SLPI sensors - IN PROGRESS]
+    L --> M[Auto-rotate & brightness / SLPI sensors - WORKING]
     M --> N[Camera - NOT WORKING]
     N --> K[Upstreaming & Maintenance - PLANNED]
 ```
@@ -209,7 +209,7 @@ Battery percentage, charging and the plugged-in/unplugged state work. The charge
 - [ ] **Graphics name**: Mesa freedreno reports the GL renderer as `FD640`. It should read "Qualcomm Adreno 640". Needs a Mesa renderer-name change or a gnome-control-center `info_cleanup` rule.
 
 ### Sensors
-- [x] **SLPI sensor DSP and accelerometer** — accelerometer streaming verified 2026-10-14; Phosh auto-rotate seen working once (180° off before the mount-matrix rule); boot ordering not yet verified across a clean boot
+- [x] **SLPI sensor DSP and accelerometer** — Phosh auto-rotate verified 2026-10-14, right-side up with the mount-matrix rule, including across a clean boot (this boot: `hexagonrpcd-sdsp` up at 16.8 s, greetd at 17.1 s, `iio-sensor-proxy` at 25.2 s; Phosh claims the late-appearing daemon)
   - The stock device tree has no accelerometer on an AP-visible bus; the motion sensors sit behind the SLPI sensor DSP (Qualcomm SSC / SEE). The path is SLPI remoteproc → FastRPC (`/dev/fastrpc-sdsp`) → `hexagonrpcd` serving the sensor files → `iio-sensor-proxy` (libssc, QMI over QRTR to SSC service 400) → `net.hadess.SensorProxy` → Phosh. No IIO or input device exists.
   - Firmware: `slpi.mdt`/`slpi.bNN` `SLPI.HY.2.2-00083` (OxygenOS 11) from the M1DNYT3 repository, `firmware-oneplus-guacamole` r6, plus `slpir.jsn`/`slpius.jsn` from the LineageOS modem image. The phone's `modem_b` carries the same version (a different OEM build). The LineageOS OTA carries `2.2-00121`, which on the OnePlus 7T Pro never instantiated the LSM6DSM, so it is not used.
   - Device tree: `remoteproc@2400000` enabled with the firmware name; a 16 MiB `fastrpc-shared-pool` (`shared-dma-pool`, `alloc-ranges` below 4 GiB, `reusable`) as `memory-region` of the SDSP `fastrpc` node with `qcom,vmids = <3 5 6>` (HLOS, SSC_Q6, ADSP_Q6), from hotdog patch 0126. `slpi_mem` is already the stock `0x97700000` region.
@@ -220,11 +220,13 @@ Battery percentage, charging and the plugged-in/unplugged state work. The charge
   - Mount matrix: the IMU is rotated 180° about Z, so Phosh rotated the screen upside down. `61-guacamole-accel-mount-matrix.rules` sets `ACCEL_MOUNT_MATRIX="-1, 0, 0; 0, -1, 0; 0, 0, 1"` on the FastRPC nodes (SEE's own placement matrix is reported as all zero).
   - Phosh only holds the accelerometer while the screen is on and unlocked, so `AccelerometerOrientation` reads `undefined` on an idle phone; test with the screen awake.
   - Pitfalls (from the 7T Pro notes, confirmed here where tested): the SLPI cannot be restarted hot; the sensor PD is created on the first FastRPC attach only, so never restart `hexagonrpcd` after it attached (reboot instead); `sudo` is needed for `monitor-sensor` over SSH (the D-Bus policy refuses claims from a session-less user).
-  - Still to do: verify auto-rotate across a clean boot (ordering of Phosh vs the sensor daemon), gyroscope/magnetometer/compass, and the IMU temperature.
+  - Still to do: gyroscope/magnetometer/compass, and the IMU temperature.
 
-- [ ] **Automatic brightness (ambient light sensor)**
-  - The TCS3701 (light and proximity, I2C 3 at 0x39) is reached through the same SLPI path; `iio-sensor-proxy` reports `HasAmbientLight` and `HasProximity` true since 2026-10-14.
-  - Still to do: check `LightLevel` tracks the room, and wire automatic brightness in the UI (Phosh/gsd `ambient-enabled`). Proximity during calls depends on call audio.
+- [x] **Automatic brightness (ambient light sensor)** — verified 2026-10-14
+  - The TCS3701 (light and proximity, I2C 3 at 0x39) is reached through the same SLPI path. `monitor-sensor --light` streams lux values that follow the room (about 20 lux in a dim room, 262 lux under a lamp).
+  - Phosh implements automatic brightness itself (it claims the "ambient" sensor from `net.hadess.SensorProxy`) and follows the GNOME key `org.gnome.settings-daemon.plugins.power ambient-enabled`, which is `false` by default. With it set to `true` the backlight follows the light sensor. Nothing else was needed.
+  - Proximity: `iio-sensor-proxy` reports `HasProximity` true and `near: 0`; whether it changes when covered was not tested (it only matters for calls, which need call audio first). On the OnePlus 7T Pro the SEE proximity stays silent and OxygenOS uses an ultrasonic path on the ADSP instead.
+  - Seen once: with three clients claiming at the same time (two `monitor-sensor` instances and Phosh's ambient claim), `iio-sensor-proxy` wedged: every new claim timed out, the process burned 2.5 min of CPU in 5 min and had to be SIGKILLed on restart. Not reproduced with sequential claims (light, light, accel, proximity, light all fine). If it recurs, restart `iio-sensor-proxy`; the patched daemon recovers Phosh's claims cleanly.
 
 ### Camera
 - [ ] **Cameras**

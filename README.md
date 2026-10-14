@@ -37,8 +37,8 @@ This repository contains the bringup workspace, kernel patches, device tree sour
 | **USB Peripheral** | :white_check_mark: Working | `dwc3-qcom` / USB gadget | CDC NCM / RNDIS gadget for SSH (`user@172.16.42.1`) |
 | **USB Host (OTG)** | :white_check_mark: Working | `dwc3-qcom` role switch + PM8150B Type-C / VBUS | Dual-role port managed by `qcom,pmic-typec`; a USB thumb drive enumerates at SuperSpeed and mounts in Files. USB gadget/SSH still works when attached to a PC |
 | **Battery & Charging** | :construction: WIP | `bq27411` gauge + PM8150B SMB5 charger | Percentage, charging and plugged-in state work (4.35 V / 1.5 A, kernel patches `0011`, `0012`); charge-limit daemon and wall-charger charging are WIP |
-| **Auto-rotate** | :construction: WIP | SLPI sensor DSP (SSC) + `hexagonrpcd` + `iio-sensor-proxy` | LSM6DSM accelerometer streams at 26 Hz through the sensor DSP (kernel patch `0017`, SLPI firmware, patched `hexagonrpcd`/`iio-sensor-proxy`); Phosh rotation seen once, boot ordering still being verified; see "Sensors" in `docs/PLAN.md` |
-| **Brightness Sensor** | :construction: Detected | SLPI sensor DSP (SSC) | TCS3701 light/proximity sensor is discovered by `iio-sensor-proxy`; automatic brightness not wired up yet |
+| **Auto-rotate** | :white_check_mark: Working | SLPI sensor DSP (SSC) + `hexagonrpcd` + `iio-sensor-proxy` | LSM6DSM accelerometer through the sensor DSP (kernel patch `0017`, SLPI firmware, patched `hexagonrpcd`/`iio-sensor-proxy`, udev mount matrix); Phosh rotates, verified across reboots; see "Sensors" in `docs/PLAN.md` |
+| **Brightness Sensor** | :white_check_mark: Working | SLPI sensor DSP (SSC) + `iio-sensor-proxy` | TCS3701 light sensor; Phosh automatic brightness works with `ambient-enabled` set to true (off by default); proximity reports but is untested |
 | **Camera** | :x: Not Working | SM8150 CAMSS / CCI | Not started; see "Camera" in `docs/PLAN.md` |
 | **Volume Keys** | :white_check_mark: Working | `gpio-keys` (PM8150 GPIO 6/7) | Volume up/down report `KEY_VOLUMEUP`/`KEY_VOLUMEDOWN` |
 | **GPU Acceleration** | :white_check_mark: Working | Adreno 640 / Mesa Freedreno & Turnip | GMU v2.0.261 + ZAP shader loaded; native OpenGL ES 3.2 and Vulkan 1.3 |
@@ -153,9 +153,7 @@ guacamole_nura/
   - Test WoWLAN.
   - With a SIM: validate registration, SMS, mobile data and calls via ModemManager (the modem is detected and the IPA data path is up).
 - [ ] **Firmware decompilation** (long term): reverse-engineer the proprietary blobs listed under "Proprietary Firmware (Decompilation Targets)" towards open-source replacements, starting with the WCN3990 Wi-Fi and Bluetooth firmware.
-- [ ] **Sensors** (see "Sensors" in `docs/PLAN.md`):
-  - (WIP) Verify auto-rotate across a clean boot; gyroscope, magnetometer and IMU temperature.
-  - Automatic brightness from the TCS3701 light sensor.
+- [ ] **Sensors** (see "Sensors" in `docs/PLAN.md`): gyroscope, magnetometer/compass, IMU temperature, and the proximity sensor for calls.
 - [ ] **Camera** (see "Camera" in `docs/PLAN.md`).
 - [ ] **Battery & Charging** (see "Battery & Charging" in `docs/PLAN.md`):
   - (WIP) Rework `guacamole-chgctrl.daemon` for the `bq27411-0` gauge and mainline charger controls.
