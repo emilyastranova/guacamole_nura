@@ -4,7 +4,7 @@ maintainer="Casey Connolly <kcxt@postmarketos.org>"
 pkgname=device-oneplus-guacamole
 pkgdesc="OnePlus 7 Pro"
 pkgver=4
-pkgrel=7
+pkgrel=9
 url="https://postmarketos.org"
 license="MIT"
 arch="aarch64"
@@ -39,6 +39,8 @@ source="
 	guacamole-chgctrl.initd
 	guacamole-chgctrl.daemon
 	guacamole-chgctrl.confd
+	guacamole-chgctrl.service
+	80-guacamole.preset
 	sxmo_deviceprofile-oneplus-guacamole.sh
 	90-wifi-wowlan.conf
 	90-ath10k-wowlan.rules
@@ -96,6 +98,14 @@ package() {
 	install -Dm644 "$srcdir/90-guacamole-wlanmac.rules" \
 		"$pkgdir/usr/lib/udev/rules.d/90-guacamole-wlanmac.rules"
 
+	# Charge policy (USB PD contract, DCP, thermal throttling, charge window)
+	install -Dm755 "$srcdir/guacamole-chgctrl.daemon" "$pkgdir/usr/libexec/guacamole-chgctrl"
+	install -Dm644 "$srcdir/guacamole-chgctrl.confd" "$pkgdir/etc/conf.d/guacamole-chgctrl"
+	install -Dm644 "$srcdir/guacamole-chgctrl.service" \
+		"$pkgdir/usr/lib/systemd/system/guacamole-chgctrl.service"
+	install -Dm644 "$srcdir/80-guacamole.preset" \
+		"$pkgdir/usr/lib/systemd/system-preset/80-guacamole.preset"
+
 	# Sensors: the SLPI sensor DSP is served its configuration, registry and
 	# libraries by hexagonrpcd from /usr/share/qcom. The registry is per unit
 	# and rewritten by the DSP, so it lives under /var/lib and is imported
@@ -141,10 +151,6 @@ openrc() {
 		"$subpkgdir/etc/init.d/guacamole-mpss"
 	install -Dm755 "$srcdir/guacamole-chgctrl.initd" \
 		"$subpkgdir/etc/init.d/guacamole-chgctrl"
-	install -Dm755 "$srcdir/guacamole-chgctrl.daemon" \
-		"$subpkgdir/usr/libexec/guacamole-chgctrl"
-	install -Dm644 "$srcdir/guacamole-chgctrl.confd" \
-		"$subpkgdir/etc/conf.d/guacamole-chgctrl"
 	# sxmo looks up device profiles by the exact "vendor,codename" compatible
 	# string; abuild rejects commas in source= filenames, so the tracked file
 	# uses dashes and gets installed under the comma name sxmo expects.
@@ -159,8 +165,10 @@ sha512sums="
 f97ee1223a887911aeb144bf0ab0c4a102d6d6c9a2a5ba7d4571c7b040196fb6acec848a460cda26b006806dc4e42f1da0c07d1fc47ed8b5be6e926fcb725ba6  device-oneplus-guacamole-openrc.post-install
 769e72e3f074f7515dfa3dd05fae88643fabfb2e6ed6c5f0b28fa5089e830bcbffeceb5a1d0c5ab41f809764261a20bc35074de59774606fc53c51e1a09a05fc  guacamole-mpss.initd
 9da8768a3c86029b90bd54b433b688d5c91410116cc00b6d9650ab15697e5ec0ff9e44b81d83b70cfac34187c2fac525ddea427a12d48ea0df8498597bc5d494  guacamole-chgctrl.initd
-25bd83d6dfd84f25d85eff0b52a2696da59ebb207dc718db5a1e2d1cc3efef6b99c04aa699f6ecf6a868ea9289248cf42042c9012721a2cf2c4530b59ea34427  guacamole-chgctrl.daemon
-3cd734d0a7f32356048e8b0c691d11f1b0169edfa02d619e04807f895ebfea36826c89c2701228fd38c8afba584462ee0057ced54afb510c5c3e5fc301097bf5  guacamole-chgctrl.confd
+2cd1098e78aa0d49c52fa3732e12a3f046c004cd58e9be0491596cc0c5d8016581fa15fd637c0f13ebbd412f4f5f8517da263dff32e9b87e026bffdb05ddabd1  guacamole-chgctrl.daemon
+8f5661087a2b203c9dc59875a543bf648ffa5dfd87dfafc1298b835df177370e291c6e3fb8e1055de04fb0b7d1bc58f08a97bd2f0c84fcea50f9bbc6b7c6be3e  guacamole-chgctrl.confd
+450c485ba61fbe40ba3117ea3843af781928c59ab7a1b6298966c98c059633521d4ed796ce5854d1225713fd042e1db6b3a7ec9200758005b632ec34e71950b3  guacamole-chgctrl.service
+3fa6abde06c56dc48d354adea626af2d3347abf778a9ec12456f5313d9d7ccd00ca5a86103793fde5866930cc74ae2d8e9ce3f49685ea4d27844348d1e895244  80-guacamole.preset
 c32b679c7d9cc8745ab6ca538473fa46dc96122e2b99823fe54aed06701fb921708c4e2f9d115d1d6c01588c100deeb9f410fd80439b8b6ad6724b8d33b6a53e  sxmo_deviceprofile-oneplus-guacamole.sh
 7fe009a4b2389ac56e1ff4380dd7ce90b21e0a435ebd72615e9683c6959c35024e7d2d39f62156359f74043b2c2e6f3a4a84a95a7195b6cc9943e718d342c9c3  90-wifi-wowlan.conf
 940aedbb0a39179ecde436980b27762a3690009c60f9878b4ab0f54d81e7e3e35098cabbf664effdf9aafe835ce65228ebcf97766eb45081d9cbc2cdcd320020  90-ath10k-wowlan.rules

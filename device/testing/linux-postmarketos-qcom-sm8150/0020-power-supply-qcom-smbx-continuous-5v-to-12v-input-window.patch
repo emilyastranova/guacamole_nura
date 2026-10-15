@@ -1,0 +1,75 @@
+From: emilyastranova <emily@astralabs.dev>
+Subject: [PATCH] power: supply: qcom_smbx: accept a continuous 5 V to 12 V input on SMB5
+
+The PM8150B input voltage window is "5 V or 9 V to 12 V" by default. A
+USB-PD source stepping from 5 V to 9 V passes through the excluded range,
+the charger drops VBUS valid, TCPM sees the port detach and restarts the
+contract, forever (the input flickers between charging and not charging).
+
+The stock driver programs USBIN_ADAPTER_ALLOW_OVERRIDE (0x44 in the USBIN
+block) with the requested PD voltage, or CONTINUOUS for a range, before the
+request. Program CONTINUOUS after init and again on every USB plug-in
+interrupt, in case the PMIC firmware resets it on a cable event, and log
+the read-back so the behaviour is visible in dmesg.
+---
+--- a/drivers/power/supply/qcom_smbx.c
++++ b/drivers/power/supply/qcom_smbx.c
+@@ -136,6 +136,17 @@
+ #define USBIN_LV_COLLAPSE_RESPONSE_BIT			BIT(0)
+ 
+ // FIXME: drop these and their programming, no need to set min to 4.3v
++/*
++ * Input voltage window override. The static window (USBIN_ADAPTER_ALLOW_CFG,
++ * 0x360) is "5 V or 9 V to 12 V" on PM8150B; it treats the ramp between 5 V
++ * and 9 V as invalid input, so a USB-PD source stepping up to 9 V drops VBUS
++ * valid, the Type-C port detaches and the contract restarts forever. The
++ * stock driver programs this override with the requested PD voltage
++ * (FORCE_5V/9V/12V) or CONTINUOUS for a range before the request.
++ */
++#define USBIN_ADAPTER_ALLOW_OVERRIDE			0x344
++#define USBIN_ADAPTER_ALLOW_OVERRIDE_MASK		GENMASK(3, 0)
++#define USBIN_ADAPTER_ALLOW_CONTINUOUS			BIT(3)
+ #define USBIN_5V_AICL_THRESHOLD_CFG			0x381
+ #define USBIN_5V_AICL_THRESHOLD_CFG_MASK		GENMASK(2, 0)
+ 
+@@ -742,10 +753,31 @@
+ 	return IRQ_HANDLED;
+ }
+ 
++static void smb5_allow_continuous_input(struct smb_chip *chip, const char *when)
++{
++	unsigned int val = 0;
++	int rc;
++
++	if (chip->gen != SMB5)
++		return;
++
++	rc = regmap_update_bits(chip->regmap,
++				chip->base + USBIN_ADAPTER_ALLOW_OVERRIDE,
++				USBIN_ADAPTER_ALLOW_OVERRIDE_MASK,
++				USBIN_ADAPTER_ALLOW_CONTINUOUS);
++	if (!rc)
++		rc = regmap_read(chip->regmap,
++				 chip->base + USBIN_ADAPTER_ALLOW_OVERRIDE, &val);
++	dev_info(chip->dev, "input window override (%s): rc=%d readback=0x%02x\n",
++		 when, rc, val);
++}
++
+ static irqreturn_t smb_handle_usb_plugin(int irq, void *data)
+ {
+ 	struct smb_chip *chip = data;
+ 
++	/* The PMIC firmware may reset the override on a cable event. */
++	smb5_allow_continuous_input(chip, "plug");
+ 	power_supply_changed(chip->chg_psy);
+ 
+ 	schedule_delayed_work(&chip->status_change_work,
+@@ -1219,6 +1251,8 @@
+ 					     "Couldn't set vbat max\n");
+ 	}
+ 
++	smb5_allow_continuous_input(chip, "init");
++
+ 	rc = smb_init_irq(chip, &irq, "bat-ov", smb_handle_batt_overvoltage);
+ 	if (rc < 0)
+ 		return rc;

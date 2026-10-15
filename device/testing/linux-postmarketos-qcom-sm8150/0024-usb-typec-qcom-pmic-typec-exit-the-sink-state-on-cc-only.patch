@@ -1,0 +1,31 @@
+From: emilyastranova <emily@astralabs.dev>
+Subject: [PATCH] usb: typec: qcom-pmic-typec: exit the sink state on CC only
+
+The PM8150B Type-C state machine leaves Attached.SNK when VBUS drops out
+of its 5 V window. A USB-PD source stepping to 9 V or 12 V takes VBUS
+through that window, so the port reports a detach about 70 ms after the
+Accept, TCPM restarts from SNK_UNATTACHED and the contract only completes
+when PS_RDY happens to win the race. The stock driver sets
+EXIT_SNK_BASED_ON_CC around PD resets so the sink state follows CC alone;
+set it at init. TCPM already tolerates VBUS changes while a transition is
+pending and detaches on CC.
+---
+--- a/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec_port.c
++++ b/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec_port.c
+@@ -702,7 +702,15 @@
+ 		goto done;
+ 
+ 	/* Set CC threshold to 1.6 Volts | tPDdebounce = 10-20ms */
+-	mask = SEL_SRC_UPPER_REF | USE_TPD_FOR_EXITING_ATTACHSRC;
++	/*
++	 * Leave the sink state on CC alone. Otherwise the hardware state
++	 * machine exits Attached.SNK as soon as VBUS leaves its 5 V window,
++	 * which it does during a USB-PD voltage step and a hard reset; the
++	 * port reports a detach mid-transition and the contract never
++	 * completes. The stock driver sets the same bit around PD resets.
++	 */
++	mask = SEL_SRC_UPPER_REF | USE_TPD_FOR_EXITING_ATTACHSRC |
++	       EXIT_SNK_BASED_ON_CC;
+ 	ret = regmap_update_bits(pmic_typec_port->regmap,
+ 				 pmic_typec_port->base + TYPEC_EXIT_STATE_CFG_REG,
+ 				 mask, mask);

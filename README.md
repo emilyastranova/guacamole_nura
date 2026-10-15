@@ -36,7 +36,7 @@ This repository contains the bringup workspace, kernel patches, device tree sour
 | **Storage (UFS)** | :white_check_mark: Working | `ufshcd-qcom` | Capped at HS-G3 (kernel patch `0010`): HS-G4 link errors silently dropped writes; rootfs is a pmOS image on `userdata` |
 | **USB Peripheral** | :white_check_mark: Working | `dwc3-qcom` / USB gadget | CDC NCM / RNDIS gadget for SSH (`user@172.16.42.1`) |
 | **USB Host (OTG)** | :white_check_mark: Working | `dwc3-qcom` role switch + PM8150B Type-C / VBUS | Dual-role port managed by `qcom,pmic-typec`; a USB thumb drive enumerates at SuperSpeed and mounts in Files. USB gadget/SSH still works when attached to a PC |
-| **Battery & Charging** | :construction: WIP | `bq27411` gauge + PM8150B SMB5 charger | Percentage, charging and plugged-in state work (4.35 V / 1.5 A, kernel patches `0011`, `0012`); charge-limit daemon and wall-charger charging are WIP |
+| **Battery & Charging** | :construction: WIP | `bq27411` gauge + PM8150B SMB5 charger + `guacamole-chgctrl` | Percentage, charging and plugged-in state work (4.35 V / 3 A, kernel patches `0011`, `0012`, `0018`, `0019`); charge policy daemon sets the input limit from the USB-PD contract, DCP 1.8 A, thermal throttling and an optional charge window, and reports the source type; DCP (5 V/1.8 A) and PD 5 V/3 A verified; the PD 9 V contract completes (kernel patches `0020`–`0024`) but charging from it is the one unverified step; Warp Charge unsupported |
 | **Auto-rotate** | :white_check_mark: Working | SLPI sensor DSP (SSC) + `hexagonrpcd` + `iio-sensor-proxy` | LSM6DSM accelerometer through the sensor DSP (kernel patch `0017`, SLPI firmware, patched `hexagonrpcd`/`iio-sensor-proxy`, udev mount matrix); Phosh rotates, verified across reboots; see "Sensors" in `docs/PLAN.md` |
 | **Brightness Sensor** | :white_check_mark: Working | SLPI sensor DSP (SSC) + `iio-sensor-proxy` | TCS3701 light sensor; Phosh automatic brightness works with `ambient-enabled` set to true (off by default); proximity reports but is untested |
 | **Camera** | :x: Not Working | SM8150 CAMSS / CCI | Not started; see "Camera" in `docs/PLAN.md` |
@@ -156,5 +156,5 @@ guacamole_nura/
 - [ ] **Sensors** (see "Sensors" in `docs/PLAN.md`): gyroscope, magnetometer/compass, IMU temperature, and the proximity sensor for calls.
 - [ ] **Camera** (see "Camera" in `docs/PLAN.md`).
 - [ ] **Battery & Charging** (see "Battery & Charging" in `docs/PLAN.md`):
-  - (WIP) Rework `guacamole-chgctrl.daemon` for the `bq27411-0` gauge and mainline charger controls.
-  - (WIP) Validate wall-charger (DCP) charging and thermals before raising the 1.5 A limit.
+  - (WIP) Verify charging from a 9 V / 12 V USB-PD contract (the contract itself works) and remove the diagnostic patch `0023`.
+  - Warp Charge: reverse-engineer the OnePlus fast-charge MCU protocol (see "Battery & Charging" in `docs/PLAN.md`).

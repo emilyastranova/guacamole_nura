@@ -1,0 +1,199 @@
+From: emilyastranova <emily@astralabs.dev>
+Subject: [PATCH] power: supply: qcom_smbx: follow the Type-C source current limit and voltage
+
+TCPM publishes the current a sink may draw on its tcpm-source-psy supply:
+the Rp advertisement at attach, 500 mA between a USB-PD Accept and PS_RDY
+while the source changes voltage, and the contract current afterwards.
+The charger ignored it and kept the BC1.2-derived input limit, so a sink
+drawing amps during the transition can make the source protect itself.
+
+Register a power-supply notifier and apply that limit as the input current
+limit from a work item (the notifier runs atomically).
+---
+--- a/drivers/power/supply/qcom_smbx.c	2026-10-14 17:05:55.398778108 -0600
++++ b/drivers/power/supply/qcom_smbx.c	2026-10-15 00:35:50.784983447 -0600
+@@ -147,6 +147,9 @@
+ #define USBIN_ADAPTER_ALLOW_OVERRIDE			0x344
+ #define USBIN_ADAPTER_ALLOW_OVERRIDE_MASK		GENMASK(3, 0)
+ #define USBIN_ADAPTER_ALLOW_CONTINUOUS			BIT(3)
++#define USBIN_ADAPTER_ALLOW_FORCE_12V			BIT(2)
++#define USBIN_ADAPTER_ALLOW_FORCE_9V			BIT(1)
++#define USBIN_ADAPTER_ALLOW_FORCE_5V			BIT(0)
+ #define USBIN_5V_AICL_THRESHOLD_CFG			0x381
+ #define USBIN_5V_AICL_THRESHOLD_CFG_MASK		GENMASK(2, 0)
+ 
+@@ -260,6 +263,10 @@
+ 	unsigned int icl_step_ua;
+ 
+ 	struct delayed_work status_change_work;
++	struct work_struct tcpm_icl_work;
++	struct notifier_block psy_nb;
++	unsigned int tcpm_icl_ua;
++	unsigned int tcpm_uv;
+ 	int cable_irq;
+ 	bool wakeup_enabled;
+ 
+@@ -494,6 +501,15 @@
+ 			chip->icl_max_ua);
+ 		return -EINVAL;
+ 	}
++	/*
++	 * The USB gadget reports 0 or 2 mA while unconfigured or detached,
++	 * and that report can be the last one; programming it stops all
++	 * input and the phone drains on a PC port. Never go below the USB 2
++	 * configured allowance, which is what the stock driver draws from any
++	 * SDP.
++	 */
++	if (val < SDP_CURRENT_UA)
++		val = SDP_CURRENT_UA;
+ 	val_raw = val / chip->icl_step_ua;
+ 	if (chip->gen == SMB5) {
+ 		rc = smb_select_smb5_icl_mode(chip, val);
+@@ -753,7 +769,8 @@
+ 	return IRQ_HANDLED;
+ }
+ 
+-static void smb5_allow_continuous_input(struct smb_chip *chip, const char *when)
++static void smb5_set_input_window(struct smb_chip *chip, unsigned int window,
++				  const char *when)
+ {
+ 	unsigned int val = 0;
+ 	int rc;
+@@ -763,8 +780,7 @@
+ 
+ 	rc = regmap_update_bits(chip->regmap,
+ 				chip->base + USBIN_ADAPTER_ALLOW_OVERRIDE,
+-				USBIN_ADAPTER_ALLOW_OVERRIDE_MASK,
+-				USBIN_ADAPTER_ALLOW_CONTINUOUS);
++				USBIN_ADAPTER_ALLOW_OVERRIDE_MASK, window);
+ 	if (!rc)
+ 		rc = regmap_read(chip->regmap,
+ 				 chip->base + USBIN_ADAPTER_ALLOW_OVERRIDE, &val);
+@@ -772,12 +788,110 @@
+ 		 when, rc, val);
+ }
+ 
++static void smb5_allow_continuous_input(struct smb_chip *chip, const char *when)
++{
++	smb5_set_input_window(chip, USBIN_ADAPTER_ALLOW_CONTINUOUS, when);
++}
++
++/*
++ * With a USB-PD contract in place the stock driver forces the window to the
++ * contract voltage; CONTINUOUS alone leaves the charger rejecting a 9 V
++ * input (USBIN reads 0 V, charging paused) on PM8150B.
++ */
++static void smb5_set_input_window_for_uv(struct smb_chip *chip, unsigned int uv)
++{
++	unsigned int window;
++
++	if (uv == 5000000)
++		window = USBIN_ADAPTER_ALLOW_FORCE_5V;
++	else if (uv == 9000000)
++		window = USBIN_ADAPTER_ALLOW_FORCE_9V;
++	else if (uv == 12000000)
++		window = USBIN_ADAPTER_ALLOW_FORCE_12V;
++	else
++		window = USBIN_ADAPTER_ALLOW_CONTINUOUS;
++	smb5_set_input_window(chip, window, "tcpm");
++}
++
++/*
++ * Follow the Type-C/PD source's current limit. TCPM publishes it on the
++ * tcpm-source-psy supply: the Rp advertisement at attach, the 500 mA standby
++ * limit between a PD Accept and PS_RDY (a sink must not draw more while the
++ * source changes voltage, or the source protects itself and drops VBUS), and
++ * the contract current once the new voltage is ready. The notifier runs in
++ * atomic context, so the register write is done from a work item.
++ */
++static void smb_tcpm_icl_work(struct work_struct *work)
++{
++	struct smb_chip *chip = container_of(work, struct smb_chip, tcpm_icl_work);
++	unsigned int ua = READ_ONCE(chip->tcpm_icl_ua);
++	int rc;
++
++	if (!ua) {
++		/* source gone: back to the transition-tolerant window */
++		smb5_allow_continuous_input(chip, "tcpm-off");
++		return;
++	}
++	smb5_set_input_window_for_uv(chip, READ_ONCE(chip->tcpm_uv));
++	ua = min(ua, chip->icl_max_ua);
++	rc = smb_set_current_limit(chip, ua);
++	if (!rc)
++		smb_rerun_aicl(chip);
++	dev_dbg(chip->dev, "tcpm current limit %u uA: %d\n", ua, rc);
++}
++
++static int smb_psy_notifier(struct notifier_block *nb, unsigned long event,
++			    void *data)
++{
++	struct smb_chip *chip = container_of(nb, struct smb_chip, psy_nb);
++	struct power_supply *psy = data;
++	union power_supply_propval val;
++
++	if (event != PSY_EVENT_PROP_CHANGED || !psy || psy == chip->chg_psy)
++		return NOTIFY_OK;
++	if (!psy->desc || psy->desc->type != POWER_SUPPLY_TYPE_USB ||
++	    !psy->desc->name || strncmp(psy->desc->name, "tcpm-source-psy", 15))
++		return NOTIFY_OK;
++	if (power_supply_get_property(psy, POWER_SUPPLY_PROP_ONLINE, &val) || !val.intval) {
++		if (READ_ONCE(chip->tcpm_icl_ua)) {
++			WRITE_ONCE(chip->tcpm_icl_ua, 0);
++			WRITE_ONCE(chip->tcpm_uv, 0);
++			schedule_work(&chip->tcpm_icl_work);
++		}
++		return NOTIFY_OK;
++	}
++	if (power_supply_get_property(psy, POWER_SUPPLY_PROP_CURRENT_MAX, &val) || val.intval <= 0)
++		return NOTIFY_OK;
++	WRITE_ONCE(chip->tcpm_icl_ua, val.intval);
++	if (!power_supply_get_property(psy, POWER_SUPPLY_PROP_VOLTAGE_NOW, &val))
++		WRITE_ONCE(chip->tcpm_uv, val.intval);
++	schedule_work(&chip->tcpm_icl_work);
++	return NOTIFY_OK;
++}
++
++static void smb_psy_unreg_notifier(void *data)
++{
++	struct smb_chip *chip = data;
++
++	power_supply_unreg_notifier(&chip->psy_nb);
++	cancel_work_sync(&chip->tcpm_icl_work);
++}
++
+ static irqreturn_t smb_handle_usb_plugin(int irq, void *data)
+ {
+ 	struct smb_chip *chip = data;
+ 
+-	/* The PMIC firmware may reset the override on a cable event. */
+-	smb5_allow_continuous_input(chip, "plug");
++	/*
++	 * The PMIC firmware may reset the override on a cable event, and this
++	 * interrupt also fires when the input re-validates at the new voltage
++	 * of a PD contract (0.6 ms after PS_RDY), so keep the contract window
++	 * rather than falling back to CONTINUOUS, which the charger rejects at
++	 * 9 V.
++	 */
++	if (READ_ONCE(chip->tcpm_uv))
++		smb5_set_input_window_for_uv(chip, READ_ONCE(chip->tcpm_uv));
++	else
++		smb5_allow_continuous_input(chip, "plug");
+ 	power_supply_changed(chip->chg_psy);
+ 
+ 	schedule_delayed_work(&chip->status_change_work,
+@@ -1266,6 +1380,14 @@
+ 			   smb_handle_usb_icl_change);
+ 	if (rc < 0)
+ 		return rc;
++	INIT_WORK(&chip->tcpm_icl_work, smb_tcpm_icl_work);
++	chip->psy_nb.notifier_call = smb_psy_notifier;
++	rc = power_supply_reg_notifier(&chip->psy_nb);
++	if (rc)
++		dev_warn(chip->dev, "cannot follow the Type-C current limit: %d\n", rc);
++	else
++		devm_add_action_or_reset(chip->dev, smb_psy_unreg_notifier, chip);
++
+ 	rc = smb_init_irq(chip, &irq, "wdog-bark", smb_handle_wdog_bark);
+ 	if (rc < 0)
+ 		return rc;

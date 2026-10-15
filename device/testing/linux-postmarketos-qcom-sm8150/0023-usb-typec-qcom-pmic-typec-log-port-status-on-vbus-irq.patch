@@ -1,0 +1,32 @@
+From: emilyastranova <emily@astralabs.dev>
+Subject: [PATCH] usb: typec: qcom-pmic-typec: log the port status on VBUS interrupts
+
+Diagnostic for the PD voltage-step detach on the OnePlus 7 Pro: print the
+Type-C misc and state-machine status and the charger's USBIN real-time
+status whenever the VBUS interrupt fires.
+---
+--- a/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec_port.c	2026-10-14 17:05:55.400806610 -0600
++++ b/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec_port.c	2026-10-14 17:05:55.419104356 -0600
+@@ -251,9 +251,21 @@
+ 		goto done;
+ 
+ 	switch (irq_data->virq) {
+-	case PMIC_TYPEC_VBUS_IRQ:
++	case PMIC_TYPEC_VBUS_IRQ: {
++		unsigned int misc = 0, sm = 0, usbin = 0;
++
++		regmap_read(pmic_typec_port->regmap,
++			    pmic_typec_port->base + TYPEC_MISC_STATUS_REG, &misc);
++		regmap_read(pmic_typec_port->regmap,
++			    pmic_typec_port->base + TYPEC_SM_STATUS_REG, &sm);
++		/* USBIN_INT_RT_STS of the charger block, for the diagnosis */
++		regmap_read(pmic_typec_port->regmap, 0x1310, &usbin);
++		dev_info(pmic_typec_port->dev,
++			 "vbus irq: misc 0x%02x sm 0x%02x usbin_rt 0x%02x\n",
++			 misc, sm, usbin);
+ 		vbus_change = true;
+ 		break;
++	}
+ 	case PMIC_TYPEC_CC_STATE_IRQ:
+ 	case PMIC_TYPEC_ATTACH_DETACH_IRQ:
+ 		if (!pmic_typec_port->debouncing_cc)

@@ -1,0 +1,55 @@
+From: emilyastranova <emily@astralabs.dev>
+Subject: [PATCH] usb: typec: qcom-pmic-typec: count VBUS above vSafe0V as present
+
+TYPEC_VBUS_DETECT in TYPEC_MISC_STATUS only reports VBUS at vSafe5V. When
+a USB-PD source accepts a 9 V or 12 V request and steps the supply, the
+bit clears during the transition, the port reports "VBUS off", TCPM moves
+to SNK_UNATTACHED and the source restarts; the contract never completes
+(seen on a OnePlus 7 Pro with a 45 W charger: Accept at +60 ms, VBUS off
+at +130 ms, every attach). The stock stack never used this bit for
+presence; it used the charger's USBIN plug-in status.
+
+When the detect bit is clear, also look at the Type-C state machine
+status, which the driver already polls for vSafe5V/vSafe0V when sourcing:
+a supply that is not at vSafe0V is present.
+---
+--- a/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec_port.c	2026-10-14 16:52:55.842345722 -0600
++++ b/drivers/usb/typec/tcpm/qcom/qcom_pmic_typec_port.c	2026-10-14 16:52:55.857572096 -0600
+@@ -279,15 +279,35 @@
+ 	unsigned int misc;
+ 	int ret;
+ 
++	unsigned int sm = 0;
++	bool vbus;
++
+ 	ret = regmap_read(pmic_typec_port->regmap,
+ 			  pmic_typec_port->base + TYPEC_MISC_STATUS_REG,
+ 			  &misc);
+ 	if (ret)
+ 		misc = 0;
+ 
+-	dev_dbg(dev, "get_vbus: 0x%08x detect %d\n", misc, !!(misc & TYPEC_VBUS_DETECT));
++	vbus = !!(misc & TYPEC_VBUS_DETECT);
++
++	/*
++	 * TYPEC_VBUS_DETECT only reports VBUS at vSafe5V. When a USB-PD source
++	 * steps the supply to 9 V or 12 V it clears, TCPM takes that as a
++	 * detach and the contract is torn down during the voltage transition,
++	 * forever. The state machine status also tells whether VBUS sits at
++	 * vSafe0V; anything above that is a present supply.
++	 */
++	if (!vbus) {
++		ret = regmap_read(pmic_typec_port->regmap,
++				  pmic_typec_port->base + TYPEC_SM_STATUS_REG,
++				  &sm);
++		if (!ret && !(sm & TYPEC_SM_VBUS_VSAFE0V))
++			vbus = true;
++	}
++
++	dev_dbg(dev, "get_vbus: misc 0x%08x sm 0x%08x detect %d\n", misc, sm, vbus);
+ 
+-	return !!(misc & TYPEC_VBUS_DETECT);
++	return vbus;
+ }
+ 
+ static int qcom_pmic_typec_port_vbus_toggle(struct pmic_typec_port *pmic_typec_port, bool on)

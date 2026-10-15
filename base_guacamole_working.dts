@@ -3725,6 +3725,7 @@
 				phy-names = "usb2-phy", "usb3-phy";
 				dr_mode = "otg";
 				usb-role-switch;
+				usb-psy-name = "pm8150b-charger";
 
 				ports {
 					#address-cells = <0x01>;
@@ -4366,8 +4367,8 @@
 						data-role = "dual";
 						self-powered;
 						source-pdos = <0x26019096>;
-						sink-pdos = <0x2601912c>;
-						op-sink-microwatt = <0x989680>;
+						sink-pdos = <0x2601912c 0x2d12c 0x3c0e1>;
+						op-sink-microwatt = <0x19bfcc0>;
 
 						ports {
 							#address-cells = <0x01>;
@@ -5368,7 +5369,7 @@
 		charge-full-design-microamp-hours = <4000000>;
 		voltage-min-design-microvolt = <3400000>;
 		voltage-max-design-microvolt = <4370000>;
-		constant-charge-current-max-microamp = <1500000>;
+		constant-charge-current-max-microamp = <3000000>;
 		constant-charge-voltage-max-microvolt = <4350000>;
 		charge-term-current-microamp = <310000>;
 	};

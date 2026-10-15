@@ -1,0 +1,43 @@
+From: Robin Snyders <robin@snyders.xyz>
+Subject: [PATCH] power: supply: qcom_smbx: expose input current limit
+
+Expose the USB input current limit as POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT,
+readable and writable, so the USB gadget (dwc3 usb-psy-name) and a charge
+policy daemon can set it.
+
+From hotdog-linux-bringup patch 0152 (OnePlus 7T Pro), rebased.
+---
+--- a/drivers/power/supply/qcom_smbx.c	2026-10-14 16:14:19.540800902 -0600
++++ b/drivers/power/supply/qcom_smbx.c	2026-10-14 16:14:19.542059286 -0600
+@@ -276,6 +276,7 @@
+ 	POWER_SUPPLY_PROP_MANUFACTURER,
+ 	POWER_SUPPLY_PROP_MODEL_NAME,
+ 	POWER_SUPPLY_PROP_CURRENT_MAX,
++	POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT,
+ 	POWER_SUPPLY_PROP_CURRENT_NOW,
+ 	POWER_SUPPLY_PROP_VOLTAGE_NOW,
+ 	POWER_SUPPLY_PROP_STATUS,
+@@ -669,6 +670,7 @@
+ 		val->strval = chip->name;
+ 		return 0;
+ 	case POWER_SUPPLY_PROP_CURRENT_MAX:
++	case POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT:
+ 		return smb_get_current_limit(chip, &val->intval);
+ 	case POWER_SUPPLY_PROP_CURRENT_NOW:
+ 		return smb_get_iio_chan(chip, chip->usb_in_i_chan,
+@@ -706,6 +708,7 @@
+ 		return regmap_update_bits(chip->regmap, chip->base + USBIN_CMD_IL,
+ 					  USBIN_SUSPEND_BIT, !val->intval);
+ 	case POWER_SUPPLY_PROP_CURRENT_MAX:
++	case POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT:
+ 		return smb_set_current_limit(chip, val->intval);
+ 	default:
+ 		dev_err(chip->dev, "No setter for property: %d\n", psp);
+@@ -719,6 +722,7 @@
+ 	switch (psp) {
+ 	case POWER_SUPPLY_PROP_STATUS:
+ 	case POWER_SUPPLY_PROP_CURRENT_MAX:
++	case POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT:
+ 		return 1;
+ 	default:
+ 		return 0;

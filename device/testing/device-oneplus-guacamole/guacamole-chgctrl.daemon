@@ -1,32 +1,275 @@
-#!/bin/sh
+#!/usr/bin/env python3
+"""Charge policy for the OnePlus 7 Pro on mainline.
 
-CAPACITY="/sys/class/power_supply/bq27541-0/capacity"
-STATUS="/sys/class/power_supply/pm8150b-charger/status"
+The PM8150B charger (qcom_smbx) only knows BC1.2: it sets the USB input
+current limit (ICL) from the detected SDP/CDP/DCP type and never looks at a
+USB-PD contract or the battery temperature. This daemon adds the policy the
+stock charger stack had:
 
-: ${CHG_MIN:=40}
-: ${CHG_MAX:=80}
+  - USB PD: ICL from the negotiated contract (the connector sinks 5 V/3 A,
+    9 V/3 A and 12 V/2.25 A, as on stock);
+  - DCP wall chargers: 1.8 A, the stock usb-icl;
+  - CDP: 1.5 A; SDP (a PC port): left to the USB gadget, which reports the
+    configured bMaxPower to the charger (dwc3 usb-psy-name);
+  - thermal throttling from the battery temperature;
+  - an optional charge window (CHG_MIN/CHG_MAX) by suspending the input,
+    for a phone that lives on a cable.
 
-cap=$(cat "$CAPACITY" 2>/dev/null)
-if [ -n "$cap" ] && [ "$cap" -ge "$CHG_MAX" ]; then
-	suspended=1
-	echo 0 > "$STATUS"
-else
-	suspended=0
-fi
+It publishes what the phone is charging from in /run/guacamole/charger (one
+line, e.g. "pd 9000 3000 27.0 USB PD 9 V 3 A (27 W)") and in the journal on
+every change, and `guacamole-chgctrl status` prints it.
 
-while true; do
-	cap=$(cat "$CAPACITY" 2>/dev/null)
-	if [ -z "$cap" ]; then sleep 10; continue; fi
+Warp Charge (the OnePlus 5 V/6 A protocol through the MCU at I2C 0x26) is
+not supported: a Warp charger is driven as an ordinary DCP source.
+"""
+import os
+import signal
+import sys
+import time
 
-	if [ "$suspended" -eq 0 ] && [ "$cap" -ge "$CHG_MAX" ]; then
-		echo 0 > "$STATUS"
-		suspended=1
-	elif [ "$suspended" -eq 1 ] && [ "$cap" -le "$CHG_MIN" ]; then
-		echo 2 > "$STATUS"
-		suspended=0
-	fi
+PSY = "/sys/class/power_supply"
+CHARGER = PSY + "/pm8150b-charger"
+BATTERY = PSY + "/bq27411-0"
+TYPEC_PREFIX = "tcpm-source-psy-"
+STATE_FILE = "/run/guacamole/charger"
+CONF_FILE = "/etc/conf.d/guacamole-chgctrl"
 
-	sleep 60
-done
+ICL_PD_MAX_UA = 3000000     # charger input ceiling under a PD contract
+ICL_DCP_UA = 1800000        # stock qcom,usb-icl-ua
+ICL_CDP_UA = 1500000
+ICL_SDP_UA = 500000         # USB 2 configured device
+ICL_SDP_SS_UA = 900000      # USB 3 configured device
+ICL_HOT_UA = 1000000        # stock thermal mitigation step
+TEMP_WARM = 420             # 42.0 C: throttle
+TEMP_HOT = 450              # 45.0 C: suspend input
+TEMP_HYST = 20              # 2.0 C
+POLL_S = 5
 
 
+def read(path, default=None):
+    try:
+        with open(path) as f:
+            return f.read().strip()
+    except OSError:
+        return default
+
+
+def read_int(path, default=0):
+    v = read(path)
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return default
+
+
+def write(path, value):
+    try:
+        with open(path, "w") as f:
+            f.write(str(value))
+        return True
+    except OSError as e:
+        print("chgctrl: write %s=%s failed: %s" % (path, value, e), file=sys.stderr)
+        return False
+
+
+def load_conf():
+    conf = {"CHG_MIN": 40, "CHG_MAX": 80, "KEEP_AWAKE": "yes"}
+    try:
+        for line in open(CONF_FILE):
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            conf[k.strip()] = v.strip().strip('"').strip("'")
+    except OSError:
+        pass
+    for k in ("CHG_MIN", "CHG_MAX"):
+        try:
+            conf[k] = int(conf[k])
+        except (TypeError, ValueError):
+            conf[k] = 100 if k == "CHG_MAX" else 0
+    for k in ("CHG_MIN", "CHG_MAX"):
+        conf[k] = int(os.environ.get(k, conf[k]))
+    return conf
+
+
+def battery_percent():
+    """Percentage the way UPower computes it (charge_now / charge_full).
+
+    The bq27411's own state-of-charge register has read 0 ("Critical") on
+    this unit while the remaining-charge counter said 37%, so prefer the
+    counters and fall back to capacity.
+    """
+    now = read_int(BATTERY + "/charge_now", -1)
+    full = read_int(BATTERY + "/charge_full", 0)
+    if now >= 0 and full > 0:
+        return min(100, max(0, now * 100 // full))
+    return read_int(BATTERY + "/capacity", -1)
+
+
+def typec_psy():
+    try:
+        for name in os.listdir(PSY):
+            if name.startswith(TYPEC_PREFIX):
+                return PSY + "/" + name
+    except OSError:
+        pass
+    return None
+
+
+def selected(prop):
+    """power_supply enum properties print 'a [b] c'; return the bracketed one."""
+    v = read(prop, "")
+    if "[" in v:
+        return v[v.index("[") + 1:v.index("]")]
+    return v
+
+
+def source():
+    """Classify the attached power source.
+
+    Returns (kind, voltage_mv, current_ma, label). kind is one of
+    none, sdp, cdp, dcp, pd.
+    """
+    # The charger reports online=0 while its input is suspended, so use the
+    # Type-C port (independent of the input path) to tell "nothing attached"
+    # from "attached but suspended".
+    tc = typec_psy()
+    attached = read_int(CHARGER + "/online") == 1 or (tc and read_int(tc + "/online") == 1)
+    if not attached:
+        return ("none", 0, 0, "Not connected")
+    if tc and read_int(tc + "/online") == 1:
+        t = selected(tc + "/usb_type")
+        if t in ("PD", "PD_PPS"):
+            mv = read_int(tc + "/voltage_now") // 1000 or read_int(tc + "/voltage_max") // 1000
+            ma = read_int(tc + "/current_max") // 1000
+            if ma > 0:
+                w = mv * ma / 1000000
+                return ("pd", mv, ma, "USB PD %g V %g A (%g W)" % (mv / 1000, ma / 1000, w))
+    t = selected(CHARGER + "/usb_type")
+    if t == "DCP":
+        return ("dcp", 5000, ICL_DCP_UA // 1000, "USB wall charger (DCP) 5 V %g A" % (ICL_DCP_UA / 1e6))
+    if t == "CDP":
+        return ("cdp", 5000, ICL_CDP_UA // 1000, "USB CDP port 5 V 1.5 A")
+    ma = (read_int(CHARGER + "/input_current_limit") or read_int(CHARGER + "/current_max")) // 1000
+    return ("sdp", 5000, ma, "USB port (SDP) 5 V %g A" % (ma / 1000))
+
+
+def gadget_superspeed():
+    try:
+        for name in os.listdir("/sys/class/udc"):
+            if read("/sys/class/udc/%s/current_speed" % name, "").startswith("super"):
+                return True
+    except OSError:
+        pass
+    return False
+
+
+def publish(line):
+    os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
+    tmp = STATE_FILE + ".tmp"
+    with open(tmp, "w") as f:
+        f.write(line + "\n")
+    os.replace(tmp, STATE_FILE)
+
+
+def cmd_status():
+    kind, mv, ma, label = source()
+    print(label)
+    print("battery: %d%% %s, %.2f V, %+.0f mA, %.1f C" % (
+        battery_percent(), read(BATTERY + "/status"),
+        read_int(BATTERY + "/voltage_now") / 1e6,
+        read_int(BATTERY + "/current_now") / 1000,
+        read_int(BATTERY + "/temp") / 10))
+    if kind != "none":
+        print("input limit: %g A" % (read_int(CHARGER + "/input_current_limit") / 1e6))
+    st = read(STATE_FILE)
+    if st and " | " in st:
+        print("policy: " + st.split(" | ", 1)[1])
+
+
+def resume_input(*_):
+    """Never leave the input suspended when the daemon stops."""
+    write(CHARGER + "/status", 1)
+    sys.exit(0)
+
+
+def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "status":
+        cmd_status()
+        return
+    signal.signal(signal.SIGTERM, resume_input)
+    signal.signal(signal.SIGINT, resume_input)
+    conf = load_conf()
+    suspended_by_window = False
+    hot = False
+    warm = False
+    last = None
+    last_icl = None
+    while True:
+        kind, mv, ma, label = source()
+        cap = battery_percent()
+        temp = read_int(BATTERY + "/temp", 250)
+
+        # Thermal state with hysteresis.
+        if temp >= TEMP_HOT:
+            hot = True
+        elif hot and temp < TEMP_HOT - TEMP_HYST:
+            hot = False
+        if temp >= TEMP_WARM:
+            warm = True
+        elif warm and temp < TEMP_WARM - TEMP_HYST:
+            warm = False
+
+        # Charge window: stop at CHG_MAX, resume at CHG_MIN (100 disables).
+        if kind != "none" and cap >= 0 and conf["CHG_MAX"] < 100:
+            if not suspended_by_window and cap >= conf["CHG_MAX"]:
+                suspended_by_window = True
+            elif suspended_by_window and cap <= conf["CHG_MIN"]:
+                suspended_by_window = False
+        elif kind == "none":
+            suspended_by_window = False
+
+        suspend = kind != "none" and (hot or suspended_by_window)
+        reason = ""
+        if kind != "none":
+            if hot:
+                reason = "input suspended: battery %.1f C" % (temp / 10)
+            elif suspended_by_window:
+                reason = "input suspended: charge window %d-%d%%" % (conf["CHG_MIN"], conf["CHG_MAX"])
+            elif warm:
+                reason = "throttled to %g A: battery %.1f C" % (ICL_HOT_UA / 1e6, temp / 10)
+
+        # Apply: input suspend through STATUS (0 suspends, 1 resumes), then the ICL.
+        write(CHARGER + "/status", 0 if suspend else 1)
+        icl = None
+        if kind == "pd":
+            icl = min(ma * 1000, ICL_PD_MAX_UA)
+        elif kind == "dcp":
+            icl = ICL_DCP_UA
+        elif kind == "cdp":
+            icl = ICL_CDP_UA
+        elif kind == "sdp":
+            # The gadget reports its allowance to the charger (dwc3
+            # usb-psy-name), but its last report can be the 2 mA
+            # unconfigured value; keep the configured USB 2/3 figure.
+            icl = ICL_SDP_SS_UA if gadget_superspeed() else ICL_SDP_UA
+        if icl is not None and warm:
+            icl = min(icl, ICL_HOT_UA)
+        if icl is not None and not suspend and (icl != last_icl or kind == "sdp"):
+            if write(CHARGER + "/input_current_limit", icl):
+                last_icl = icl
+        if kind == "none" or suspend:
+            last_icl = None
+
+        line = "%s %d %d %.1f %s%s" % (kind, mv, ma, mv * ma / 1e6, label,
+                                        (" | " + reason) if reason else "")
+        if line != last:
+            publish(line)
+            print("chgctrl: " + line, flush=True)
+            last = line
+        time.sleep(POLL_S)
+
+
+if __name__ == "__main__":
+    main()

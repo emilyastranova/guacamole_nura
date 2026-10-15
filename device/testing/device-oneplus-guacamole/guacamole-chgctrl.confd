@@ -1,13 +1,10 @@
-# Resume charging when battery drops to or below this percentage
+# Charge window. Charging stops when the battery reaches CHG_MAX percent and
+# resumes at CHG_MIN. Set CHG_MAX=100 to always charge to full (the default for
+# a phone); 40/80 suits a phone that lives on a cable as a server.
 CHG_MIN=40
+CHG_MAX=100
 
-# Stop charging when battery reaches this percentage
-CHG_MAX=80
-
-# Server mode: while charge control runs, hold a kernel wake lock so the device
-# never suspends (keeps Docker / LAN services reachable). This treats "charge
-# control enabled" as "permanently plugged in == server". Set to "no" to keep
-# normal phone-style suspend behaviour while still limiting charge.
+# OpenRC only: hold a kernel wake lock while charge control runs so the
+# device never suspends (keeps Docker / LAN services reachable). Set to "no"
+# to keep normal phone-style suspend behaviour.
 KEEP_AWAKE=yes
-
-

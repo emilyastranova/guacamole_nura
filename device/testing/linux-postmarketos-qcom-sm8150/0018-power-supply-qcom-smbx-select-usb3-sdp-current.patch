@@ -1,0 +1,53 @@
+From: Robin Snyders <robin@snyders.xyz>
+Subject: [PATCH] power: supply: qcom_smbx: select USB3 SDP current
+
+A USB 3 host lets a configured device draw 900 mA. On SMB5 the input
+current limit register is only honoured for SDP values when the ICL
+options select the matching USB 2 (500 mA) or USB 3 (900 mA) mode, so
+set those bits alongside the limit.
+
+From hotdog-linux-bringup patch 0151 (OnePlus 7T Pro), rebased.
+---
+--- a/drivers/power/supply/qcom_smbx.c	2026-10-14 16:14:19.533428156 -0600
++++ b/drivers/power/supply/qcom_smbx.c	2026-10-14 16:14:19.536752253 -0600
+@@ -198,6 +198,7 @@
+ #define STAT_SW_OVERRIDE_CFG_BIT			BIT(6)
+ 
+ #define SDP_CURRENT_UA					500000
++#define USB3_SDP_CURRENT_UA				900000
+ #define CDP_CURRENT_UA					1500000
+ #define DCP_CURRENT_UA					1500000
+ #define CURRENT_MAX_UA					DCP_CURRENT_UA
+@@ -456,6 +457,20 @@
+ 				  RERUN_AICL_BIT, RERUN_AICL_BIT);
+ }
+ 
++static int smb_select_smb5_icl_mode(struct smb_chip *chip, unsigned int val)
++{
++	unsigned int mode = 0;
++
++	if (val == SDP_CURRENT_UA)
++		mode = USB51_MODE_BIT;
++	else if (val == USB3_SDP_CURRENT_UA)
++		mode = CFG_USB3P0_SEL_BIT | USB51_MODE_BIT;
++
++	return regmap_update_bits(chip->regmap,
++				  chip->base + USBIN_ICL_OPTIONS,
++				  CFG_USB3P0_SEL_BIT | USB51_MODE_BIT, mode);
++}
++
+ static int smb_set_current_limit(struct smb_chip *chip, unsigned int val)
+ {
+ 	unsigned char val_raw;
+@@ -468,6 +483,11 @@
+ 		return -EINVAL;
+ 	}
+ 	val_raw = val / chip->icl_step_ua;
++	if (chip->gen == SMB5) {
++		rc = smb_select_smb5_icl_mode(chip, val);
++		if (rc < 0)
++			return rc;
++	}
+ 
+ 	rc = regmap_write(chip->regmap, chip->base + USBIN_CURRENT_LIMIT_CFG,
+ 			  val_raw);

@@ -3,7 +3,7 @@ maintainer="Pan Ortiz <panjeoc@proton.me>"
 _flavor="postmarketos-qcom-sm8150"
 pkgname=linux-$_flavor
 pkgver=6.17.0
-pkgrel=15
+pkgrel=25
 pkgdesc="Mainline Kernel fork for SM8150 devices"
 arch="aarch64"
 _carch="arm64"
@@ -49,6 +49,13 @@ source="
 	0015-net-ipa-bound-gsi-trans-commit-wait.patch
 	0016-net-ipa-v4.1-endp-init-ctrl.patch
 	0017-misc-fastrpc-allocate-sensors-messages-from-the-reserved-pool.patch
+	0018-power-supply-qcom-smbx-select-usb3-sdp-current.patch
+	0019-power-supply-qcom-smbx-expose-input-current-limit.patch
+	0020-power-supply-qcom-smbx-continuous-5v-to-12v-input-window.patch
+	0021-usb-typec-qcom-pmic-typec-count-vbus-above-vsafe0v-as-present.patch
+	0022-power-supply-qcom-smbx-follow-the-type-c-source-current-limit.patch
+	0023-usb-typec-qcom-pmic-typec-log-port-status-on-vbus-irq.patch
+	0024-usb-typec-qcom-pmic-typec-exit-the-sink-state-on-cc-only.patch
 "
 builddir="$srcdir/linux-$_tag"
 
@@ -116,4 +123,11 @@ cbba23a302209890f06884dce26c792dc71af8a8817b6ab85898a474b9aea0d736dfaf9a08411d41
 ca71b6c960f8d13d529ef4966a031aee8c2fc755ee6545596578ad76719e0edde62ba8748d6ec7517ba57a39572beeca350fd2b4c883b1d3b48cbb490aa983bb  0015-net-ipa-bound-gsi-trans-commit-wait.patch
 8e086382ba2381dc5d23234648b20836770b025bec196a745e177cae35bf959d22488558127dbe57dfb13697e5bdcdae6353bbc990b3bdf29f8526851d2919fd  0016-net-ipa-v4.1-endp-init-ctrl.patch
 b94243216bd03d7871927790da475443a82d6a207c60f6c6fb0c8cd7218df6fa09bcce4c29a5e9b52ab2cefc842dcacb4f1fb6bb66544d7cda0bed0dd6cbe013  0017-misc-fastrpc-allocate-sensors-messages-from-the-reserved-pool.patch
+13fc0b078dd3c660da68540963f2080d72d4ca8575602759bfc95376c4fe348b1f93d22bb4bad452b5de3b83c72f6153837d0479d16854eec9f1f520bea2a160  0018-power-supply-qcom-smbx-select-usb3-sdp-current.patch
+36df98e9bbe6cfa27f509c4f67c9f6325b68c2f7270baf3fe5873a9c82487e73d342c3a92a94f89b67037540201e77ba5b63f6c875c10d9e7b05d2a8bc92331d  0019-power-supply-qcom-smbx-expose-input-current-limit.patch
+fa0e249ae86f782b24baa0a4d17105d2098177909a109a004b7591df8edcc7a938cc6e9dc5506677c482ff8a9079eee808a332ccd167efcca96af918f7b6c053  0020-power-supply-qcom-smbx-continuous-5v-to-12v-input-window.patch
+d7be0ca8533c3ae01a68ab6b5face782c4aa22f71244e4b802069fce7a0f73a8ec22322ed9ff0bb1855231a7754803e2bff9091e4de35612492b7391262ad249  0021-usb-typec-qcom-pmic-typec-count-vbus-above-vsafe0v-as-present.patch
+1bdc1dd5e1e6ed7101dfb538c05686e51d83f398dd2a4fc26631c2525a930a910c4715538f33ae7eef46283da212456546a20f8365d75464ba81f5d78d06802a  0022-power-supply-qcom-smbx-follow-the-type-c-source-current-limit.patch
+da931db441637e9c8d8c1790ee67df0a18680de9ed5d9d519fdd7213ef6d191707e23dbfe88e28e712a6be43a4e5d2b4641f15726111751bb3619fb5eb934e69  0023-usb-typec-qcom-pmic-typec-log-port-status-on-vbus-irq.patch
+a98becf1c7bc9314c5dca98e0b1920068c448ae635d0951d90d721784eb2f500cf0b9368beb8c8827550114d7116906996c0fdd8948a4920d48eadbfe1a21180  0024-usb-typec-qcom-pmic-typec-exit-the-sink-state-on-cc-only.patch
 "
