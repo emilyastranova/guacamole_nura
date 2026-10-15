@@ -4,6 +4,12 @@
 CHG_MIN=40
 CHG_MAX=100
 
+# Input limit on a PC port (SDP), in microamps. 0 picks the USB figure for
+# the negotiated link: 500000 (USB 2) or 900000 (USB 3). A USB 3 port that
+# only links at USB 2 speed, or a port known to supply more, can be set
+# higher, e.g. 900000.
+CHG_SDP_UA=0
+
 # OpenRC only: hold a kernel wake lock while charge control runs so the
 # device never suspends (keeps Docker / LAN services reachable). Set to "no"
 # to keep normal phone-style suspend behaviour.

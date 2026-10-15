@@ -73,7 +73,7 @@ def write(path, value):
 
 
 def load_conf():
-    conf = {"CHG_MIN": 40, "CHG_MAX": 80, "KEEP_AWAKE": "yes"}
+    conf = {"CHG_MIN": 40, "CHG_MAX": 80, "KEEP_AWAKE": "yes", "CHG_SDP_UA": 0}
     try:
         for line in open(CONF_FILE):
             line = line.strip()
@@ -88,8 +88,11 @@ def load_conf():
             conf[k] = int(conf[k])
         except (TypeError, ValueError):
             conf[k] = 100 if k == "CHG_MAX" else 0
-    for k in ("CHG_MIN", "CHG_MAX"):
-        conf[k] = int(os.environ.get(k, conf[k]))
+    for k in ("CHG_MIN", "CHG_MAX", "CHG_SDP_UA"):
+        try:
+            conf[k] = int(os.environ.get(k, conf[k]))
+        except (TypeError, ValueError):
+            conf[k] = 0
     return conf
 
 
@@ -253,7 +256,7 @@ def main():
             # The gadget reports its allowance to the charger (dwc3
             # usb-psy-name), but its last report can be the 2 mA
             # unconfigured value; keep the configured USB 2/3 figure.
-            icl = ICL_SDP_SS_UA if gadget_superspeed() else ICL_SDP_UA
+            icl = conf["CHG_SDP_UA"] or (ICL_SDP_SS_UA if gadget_superspeed() else ICL_SDP_UA)
         if icl is not None and warm:
             icl = min(icl, ICL_HOT_UA)
         if icl is not None and not suspend and (icl != last_icl or kind == "sdp"):
