@@ -97,17 +97,20 @@ def load_conf():
 
 
 def battery_percent():
-    """Percentage the way UPower computes it (charge_now / charge_full).
+    """The gauge's own state of charge, which is what the phone displays.
 
-    The bq27411's own state-of-charge register has read 0 ("Critical") on
-    this unit while the remaining-charge counter said 37%, so prefer the
-    counters and fall back to capacity.
+    It is voltage-aware: a loaded cell near 3.4 V reads 0 even when the
+    remaining-charge counter still shows hundreds of mAh. The counters are
+    only a fallback when the register is missing.
     """
+    cap = read_int(BATTERY + "/capacity", -1)
+    if cap >= 0:
+        return cap
     now = read_int(BATTERY + "/charge_now", -1)
     full = read_int(BATTERY + "/charge_full", 0)
     if now >= 0 and full > 0:
         return min(100, max(0, now * 100 // full))
-    return read_int(BATTERY + "/capacity", -1)
+    return -1
 
 
 def typec_psy():
