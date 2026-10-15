@@ -131,7 +131,12 @@ def selected(prop):
     return v
 
 
-def source():
+def sdp_limit_ua(conf):
+    """Input limit the policy applies on a PC port."""
+    return conf["CHG_SDP_UA"] or (ICL_SDP_SS_UA if gadget_superspeed() else ICL_SDP_UA)
+
+
+def source(conf=None):
     """Classify the attached power source.
 
     Returns (kind, voltage_mv, current_ma, label). kind is one of
@@ -157,7 +162,8 @@ def source():
         return ("dcp", 5000, ICL_DCP_UA // 1000, "USB wall charger (DCP) 5 V %g A" % (ICL_DCP_UA / 1e6))
     if t == "CDP":
         return ("cdp", 5000, ICL_CDP_UA // 1000, "USB CDP port 5 V 1.5 A")
-    ma = (read_int(CHARGER + "/input_current_limit") or read_int(CHARGER + "/current_max")) // 1000
+    ma = (sdp_limit_ua(conf) if conf else
+          (read_int(CHARGER + "/input_current_limit") or read_int(CHARGER + "/current_max"))) // 1000
     return ("sdp", 5000, ma, "USB port (SDP) 5 V %g A" % (ma / 1000))
 
 
@@ -180,7 +186,7 @@ def publish(line):
 
 
 def cmd_status():
-    kind, mv, ma, label = source()
+    kind, mv, ma, label = source(load_conf())
     print(label)
     print("battery: %d%% %s, %.2f V, %+.0f mA, %.1f C" % (
         battery_percent(), read(BATTERY + "/status"),
@@ -213,7 +219,7 @@ def main():
     last = None
     last_icl = None
     while True:
-        kind, mv, ma, label = source()
+        kind, mv, ma, label = source(conf)
         cap = battery_percent()
         temp = read_int(BATTERY + "/temp", 250)
 
@@ -259,7 +265,7 @@ def main():
             # The gadget reports its allowance to the charger (dwc3
             # usb-psy-name), but its last report can be the 2 mA
             # unconfigured value; keep the configured USB 2/3 figure.
-            icl = conf["CHG_SDP_UA"] or (ICL_SDP_SS_UA if gadget_superspeed() else ICL_SDP_UA)
+            icl = sdp_limit_ua(conf)
         if icl is not None and warm:
             icl = min(icl, ICL_HOT_UA)
         if icl is not None and not suspend and (icl != last_icl or kind == "sdp"):
