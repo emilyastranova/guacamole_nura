@@ -4367,8 +4367,8 @@
 						data-role = "dual";
 						self-powered;
 						source-pdos = <0x26019096>;
-						sink-pdos = <0x2601912c 0x2d12c 0x3c0e1>;
-						op-sink-microwatt = <0x19bfcc0>;
+						sink-pdos = <0x2601912c>;
+						op-sink-microwatt = <0xe4e1c0>;
 
 						ports {
 							#address-cells = <0x01>;
