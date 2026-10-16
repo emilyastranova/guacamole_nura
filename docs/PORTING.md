@@ -155,6 +155,35 @@ None of it is large; most of it is glue around generic daemons.
 - Phosh releases the accelerometer while the screen is off; the proxy must be running and enumerated before the compositor claims sensors at boot (hence the ordering above and the iio-sensor-proxy patch).
 - Battery percentage shown by the UI is the gauge's `capacity` register (voltage-aware); the shutdown trigger is its Critical level.
 
+## Moving to a newer kernel
+
+Checked 2026-10-16 against the trees that matter:
+
+- The device support tree moved: postmarketOS now builds `linux-postmarketos-qcom-sm8150` **7.0.0** from `gitlab.postmarketos.org/soc/qualcomm-sm8150/linux`, tag `v7.0.0-sm8150` (2026-06-26), with three small patches of its own (`enable-ufs`, a libbpf fix, a vayu OTG fix). The old `gitlab.com/sm8150-mainline/linux` stops at `v6.17.0-sm8150`. There is no 7.1/7.2 tag of either; mainline is at 7.3-rc.
+- That tree carries about 80 commits over upstream (SMB5 charger driver, the OnePlus/Xiaomi device trees, panels, touch drivers, a few `FROMLIST` patches). Rebasing it to 7.2.9 by hand is the pmOS maintainers' job every few releases; doing it here means carrying those 80 as well as ours.
+
+So the practical step is `v6.17.0-sm8150` → `v7.0.0-sm8150`, not → 7.2.9. What that costs, from a dry run of our 24 patches against the files at `v7.0.0-sm8150`:
+
+| Patch | At v7.0.0-sm8150 | Action |
+| :--- | :--- | :--- |
+| `0001` lid switch, `0003` LLVM build | already in the tree | drop |
+| `0002` enable UFS | applies; pmaports 7.0.0 ships its own copy | use theirs |
+| `0004` DSC panel + DSI, `0005` touch reset, `0007` TFA9874, `0009` ath10k, `0010` UFS HS-G3, `0011` SMB5 limits, `0012` bq27xxx, `0017` FastRPC, `0019` ICL property, `0020` input window, `0021`, `0023`, `0024` Type-C | apply (some with offset) | keep |
+| `0013`, `0014`, `0016` IPA v4.1 | already in the tree (`ipa_data-v4.1.c`, `qcom,sm8150-ipa`) | drop |
+| `0015` bounded `gsi_trans_commit_wait()` | still needed (`wait_for_completion` unbounded) | keep |
+| `0006` geni I2C FIFO mode | 2 of 3 hunks fail; the driver's DMA/FIFO selection was reworked | rebase, or test whether it is still needed |
+| `0008` QUAT MI2S + SLIMbus maps | 2 of 4 hunks fail; `sm8150.c` already handles `QUATERNARY_MI2S_RX` in `hw_params` | rebase the remaining half |
+| `0018` USB3 SDP current, `0022` TCPM follow | hunks fail (context moved in `qcom_smbx.c`) | rebase (mechanical) |
+
+Beyond the patches:
+
+- **Device tree:** this is the real work. `base_guacamole_working.dts` is a flattened copy of the 6.17 DTB; the 7.0 tree's `sm8150-oneplus-guacamole.dts` is 69 lines (panel, touch) plus a 544-line common dtsi (modem, Wi-Fi, remoteprocs, UFS), and `sm8150.dtsi` now carries the IPA node. None of our additions (TFA9874/I2C/audio routing, bq27411, charger and battery, Type-C connector and VBUS, Bluetooth UART, `qcom,dload-mode`, volume keys, SLPI enable and FastRPC pool, SMP2P IPA entries, reserved-memory fix-ups) are there. Rebuild the DTB from 7.0, re-flatten, and re-apply the deltas listed under "Device tree" above; better, turn them into a proper `.dts` on top of the tree so the next move is a rebase instead of a re-derivation. `scripts/patch_dtb.py` anchors on exact text and will need its anchors checked.
+- **Config:** start from pmaports' 7.0.0 `config-postmarketos-qcom-sm8150.aarch64` and re-add this project's options (`CONFIG_SND_SOC_TFA9874=m` and the list under "Kernel configuration").
+- **User space and firmware:** unchanged. Everything talks to stable interfaces (`/sys/class/power_supply`, `/dev/fastrpc-*`, QRTR, ALSA UCM, `net.hadess.SensorProxy`). The only coupling is the writable `input_current_limit` property, which `0019` provides.
+- **Verification:** the same hardware checklist as `PLAN.md`: charger registers `0x1070`/`0x1061`/`0x1370` before leaving the phone on a charger, UFS write integrity, Wi-Fi/BT/modem detection, sensors, PD 5 V contract.
+
+Rough size: a day for patches and config, two to three days for the device tree and re-verification, assuming the 7.0 tree boots guacamole as it claims (panel and touch) and nothing regressed in the SMB5 or sensor paths.
+
 ## Not done anywhere yet
 
 Earpiece and call audio, cellular with a SIM, the gyroscope/compass in user space, proximity for calls, cameras, Warp Charge (needs the OnePlus fast-charge MCU protocol), DisplayPort alternate mode, the FSA4480 audio switch, and the fingerprint sensor (TrustZone-bound). See `PLAN.md`.
