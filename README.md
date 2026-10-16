@@ -138,6 +138,7 @@ guacamole_nura/
 │
 └── docs/                           # Detailed technical documentation
     ├── PLAN.md                     # Bringup roadmap and status
+    ├── PORTING.md                  # Kernel space vs user space split, for other distributions
     └── BRINGUP_GUIDE.md            # Hardware notes and bringup walkthrough
 ```
 
