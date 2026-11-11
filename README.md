@@ -45,7 +45,7 @@ This repository contains the bringup workspace, kernel patches, device tree sour
 | **Wi-Fi** | :white_check_mark: Working | `ath10k_snoc` (WCN3990) | 2.4 and 5 GHz, DHCP and internet; OxygenOS 12-era WLAN firmware + kernel patch `0009`. Factory MAC as the interface address; NetworkManager uses a stable per-network MAC when connected. WoWLAN pending |
 | **Bluetooth** | :white_check_mark: Working | `hci_qca` (WCN3990) on UART13 | Scanning and HID devices; stable address from the factory Wi-Fi MAC; audio profiles untested |
 | **Modem / MPSS** | :construction: Detected | Hexagon remoteproc / PAS + IPA v4.1 (`rmnet_ipa0`) | ModemManager detects the modem (QMI over QRTR, IPA data path, kernel patches `0013`–`0016`); SIM, registration, data and calls untested, no SIM fitted yet; see "Wi-Fi, Bluetooth & Modem Bringup" in `docs/PLAN.md` |
-| **Audio** | :white_check_mark: Speakers & Mic | QDSP6 ADSP + 2x NXP TFA9874 (QUAT MI2S) + WCD9340 (SLIMbus) | Stereo speakers and internal mic working via UCM2; earpiece/call audio and speaker protection pending |
+| **Audio** | :white_check_mark: Speakers (Mic WIP) | QDSP6 ADSP + 2x NXP TFA9874 (QUAT MI2S) | Stereo speakers verified at full volume via PipeWire/WirePlumber S16LE override; internal mic and call audio pending |
 
 ---
 
@@ -61,7 +61,7 @@ The OnePlus 7 Pro uses a high-density 1440x3120 90Hz Samsung AMOLED panel requir
 The `s6sy761` digitizer IC on the OnePlus 7 Pro is powered by **PM8150 LDO 17** (`vreg_l17a_3p0`, 3.0V), unlike the OnePlus 7T Pro which uses PM8150L. Additionally, GPIO 119 (`tp-1v8-active`) must be driven HIGH to enable the 1.8V digital rail. With both supplies configured, the controller probes at address `0x48` and reports multi-touch events on `/dev/input/event1`.
 
 ### Speaker Amplifiers
-The loudspeakers are not driven by the WCD9340 codec. Two NXP TFA9874 amplifiers (I2C `0x34` top/earpiece, `0x35` bottom, on `i2c@890000`) receive audio over `QUATERNARY_MI2S_RX` at S24_LE, 48 kHz. Their register profile matches the stock `/vendor/firmware/tfa98xx.cnt`. The WCD9340 on SLIMbus handles the microphones.
+The loudspeakers are not driven by the WCD9340 codec. Two NXP TFA9874 amplifiers (I2C `0x34` top/earpiece, `0x35` bottom, on `i2c@890000`) receive audio over `QUATERNARY_MI2S_RX` at 48 kHz. Their register profile matches the stock `/vendor/firmware/tfa98xx.cnt`. Enforcing `S16LE` via WirePlumber aligns the audio samples with the DSP/TDM slots, restoring full acoustic volume across PipeWire. The WCD9340 on SLIMbus handles the microphones.
 
 ### Download-Mode Cookie and Reboot
 Qualcomm boot firmware sets a download-mode cookie in TCSR at boot, so any reset that Linux does not mark as clean ends in Qualcomm crashdump mode (`05c6:900e`) instead of a reboot. The SCM driver clears the cookie at probe and on clean shutdown, but only when the device tree describes the register with `qcom,dload-mode`. Without it the driver falls back to an SCM call that does not clear the cookie on SM8150, and reboots with Wi-Fi on (the modem hosting the active WLAN firmware) dropped into crashdump mode. The device tree now adds the TCSR syscon at `0x1fc0000` and `qcom,dload-mode = <&tcsr 0x13000>` on the `scm` node, following the OnePlus 7T Pro bringup (`hotdog-linux-bringup` patch `0098`). Reboots with Wi-Fi connected now return to fastboot normally.

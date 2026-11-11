@@ -127,16 +127,18 @@ flowchart TD
   - Loudspeakers are not on the WCD9340: two NXP TFA9874 amplifiers (rev `0x0c74`) at I2C `0x34` (top/earpiece, slot 0) and `0x35` (bottom, slot 1) on `i2c@890000` (QUP0 SE4), fed by `QUATERNARY_MI2S_RX` (GPIO 137-140, data on SD1).
   - Stock `/vendor/firmware/tfa98xx.cnt` and `mixer_paths_tavil.xml` (copied to `build/audio_ref/stock_vendor_b/`) match the OnePlus 7T Pro (`hotdog`) profile exactly; ported its `tfa9874` driver and SM8150 MI2S backend as kernel patches `0007`/`0008` (S24_LE, 48 kHz, 3.072 MHz BCLK).
   - Left/right channels verified with the GNOME sound test.
-- [x] **Internal Microphone** — verified 2026-10-11
+- [ ] **Internal Microphone** — WIP
   - OxygenOS `handset-mic` path: AMIC4 → ADC4 → DEC0 → SLIM TX0 → `SLIMBUS_0_TX` → MultiMedia2 (PCM 1), biased by MIC BIAS1.
-  - Fixed `sm8150_dai_init()` only mapping the first SLIMbus link (capture was otherwise silent).
-- [x] **UCM2 & Sound Server**
-  - `device-oneplus-guacamole` installs `conf.d/sm8150/OnePlus 7 Pro.conf` + `OnePlus/guacamole/HiFi.conf` (Speaker + Mic). PulseAudio exposes `HiFi__Speaker__sink` / `HiFi__Mic__source`.
+  - While ALSA routing sequences were verified, the QDSP6 AFE port start fails with `-22` (`EINVAL`) during runtime DAI prepare on `SLIMBUS_0_TX`. Bundling `Mic` into the UCM `HiFi` use-case caused PipeWire ACP probing to reject the sound card entirely; commented out in `HiFi.conf` until the kernel SLIMbus DAI channel mapping is resolved.
+- [x] **UCM2 & PipeWire / WirePlumber Sound Server** — verified 2026-11-12
+  - `device-oneplus-guacamole` installs `conf.d/sm8150/OnePlus 7 Pro.conf` + `OnePlus/guacamole/HiFi.conf` (Speaker).
+  - Resolved PipeWire volume attenuation: PipeWire defaulted to `S24_32LE` format for `hw:Pro,0`, which caused TDM slot MSB misalignment in the Qualcomm DSP and ~ -48 dB digital attenuation ("ultra low volume" at 100%).
+  - Added `51-oneplus-sound.conf` WirePlumber rule enforcing `audio.format = "S16LE"` and `audio.rate = 48000`, restoring full acoustic volume across both speakers in Phosh, GNOME Settings, and all applications.
 - [ ] **Remaining audio work**
+  - Fix kernel SLIMbus DAI channel mapping for `SLIMBUS_0_TX` so internal microphone capture works without AFE error `-22`.
   - Earpiece-only "receiver" profile for calls (top TFA, stock `handset` path) and voice call routing (depends on the modem bringup).
   - Secondary/ANC microphones (AMIC1/AMIC3/AMIC5) and noise-suppression dual-mic capture.
   - Speaker protection (stock uses ADSP feedback via `QUAT_MI2S` TX / VI sense); conservative default volume and thermal testing.
-  - Resolve PulseAudio and PipeWire/WirePlumber both running (pick one; install `pipewire-pulse` if PipeWire).
   - WCD934x SoundWire controller probe fails `-22` (harmless: no WSA amps on this phone).
   - Remove the stray unpackaged UCM files on the device (`/usr/share/alsa/ucm2/Qualcomm/sm8150/`, `conf.d/sm8150/sm8150.conf`, `conf.d/OnePlus 7 Pro/`) that route speakers via SLIMbus.
 
